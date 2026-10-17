@@ -124,7 +124,9 @@ export function ModernShell({
   )
 
   const compact = modernDensity === "compact"
-  const nowMs = useNowTicker()
+  // Only dashboard metrics depend on this clock. Keep Settings/Customize/Polls
+  // idle instead of rebuilding the hidden widget groups every second.
+  const nowMs = useNowTicker({ enabled: screen === "dashboard" })
   const persistEnabled = usePersistUsageHistory()
   const { dailyRows, rollup, rollup30, scheduleReload: scheduleRollupReload } = useWeeklyRollup(persistEnabled)
   const { summary: historyInsights, scheduleReload: scheduleHistoryInsightsReload } =
