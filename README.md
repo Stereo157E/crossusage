@@ -128,7 +128,7 @@ global installation, use `just bun=bun dev` or `just bun=bun setup`.
 | --- | --- |
 | `just` | List commands |
 | `just setup` | Install frontend dependencies and fetch Rust dependencies with lockfiles |
-| `just dev` | Desktop development with hot reload; prepare the CLI sidecar first |
+| `just dev` | Desktop development with hot reload; incremental debug builds for app and CLI sidecar |
 | `just build` | Native release build, frontend and bundled resources |
 | `just run` | Start the existing `target/release/crossusage` build |
 | `just diagnose` | Linux GDB capture; press Ctrl+C once if the app freezes |
@@ -137,12 +137,17 @@ global installation, use `just bun=bun dev` or `just bun=bun setup`.
 | `just cli list` | Run a CLI command from source |
 | `just bundle` | Platform installer bundles via Tauri; optional Tauri build arguments |
 
-`just build` does not require updater signing keys. `just bundle` uses the existing
+`just dev` prepares the debug CLI sidecar automatically, sharing the native Cargo
+cache with the app. The first start compiles missing dependencies; subsequent
+starts only compile changed Rust code. It does not build release artifacts or
+production frontend assets. `just build` creates the optimized release build
+and does not require updater signing keys. `just bundle` uses the existing
 Tauri packaging configuration and its platform/signing requirements. Recipes
 inherit your environment, including `CARGO_HOME`, `CARGO_NET_OFFLINE` and explicit
 graphics overrides. The Linux diagnostic recipe uses its existing clean-launch
-environment. The development and build hooks regenerate bundled plugins,
-including the generated Cursor Nightly source.
+environment. The development and build hooks synchronize bundled plugins,
+including the generated Cursor Nightly source, preserving timestamps when the
+contents are unchanged. Run `npm run test:build-scripts` for the build-hook tests.
 
 The existing commands remain available:
 

@@ -126,4 +126,6 @@ run("bun", ["copy-bundled.cjs"]);
 
 exitIfDevListenPortBusy(DEV_PORT);
 
+run("bash", ["scripts/prepare-cli-sidecar.sh", "debug"]);
+
 run("bun", ["x", "vite", "--host", "127.0.0.1", "--port", String(DEV_PORT), "--strictPort"]);

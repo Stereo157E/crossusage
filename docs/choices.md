@@ -99,3 +99,6 @@
 - justfile: default build means native release plus resources, with installer packaging exposed separately as bundle. Dev/build prepare the CLI sidecar. Use npm-executed Bun for existing hooks without requiring a global Bun installation; keep the runner overridable and inherit Cargo/graphics environment choices.
 - Fork maintenance: use main for fork changes and merge upstream/feat/linux-windows-native-support through dedicated integration branches. Keep application updates separate from Git synchronization.
 - Fork updates are disabled until our own signed release channel exists: no upstream endpoint/key, no native updater registration/capability, no updater artifacts, and no frontend polling/manual update actions. Preserve the upstream hook logic behind a disabled policy to simplify future merges and re-enabling. Provider refresh timers remain enabled.
+
+- Development: prepare the CLI sidecar in the debug profile from the shared Tauri before-dev hook. Keep release as the packaging script default; preserve unchanged generated plugin and sidecar timestamps so Cargo can reuse its native cache.
+- Claude credentials: prefer the native file store on Linux/Windows; retain Keychain precedence on macOS. Log redacted error details when a desktop probe fails.

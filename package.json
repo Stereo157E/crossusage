@@ -24,6 +24,7 @@
     "tauri:build": "tauri build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:build-scripts": "node scripts/prepare-cli-sidecar.test.cjs && node scripts/copy-bundled.test.cjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage.enabled",
     "tauri": "env RUST_LOG=info,ignore=warn,globset=warn,tauri_cli=warn tauri"

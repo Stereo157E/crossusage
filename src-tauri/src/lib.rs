@@ -891,7 +891,17 @@ fn run_and_emit_probe(
                 matches!(line, plugin_engine::runtime::MetricLine::Badge { label, .. } if label == "Error")
             });
             if has_error {
-                log::warn!("probe {} completed with error", plugin_id);
+                for line in &output.lines {
+                    if let plugin_engine::runtime::MetricLine::Badge { label, text, .. } = line {
+                        if label == "Error" {
+                            log::warn!(
+                                "probe {} completed with error: {}",
+                                plugin_id,
+                                plugin_engine::host_api::redact_log_message(text)
+                            );
+                        }
+                    }
+                }
             } else {
                 log::info!(
                     "probe {} completed ok ({} lines)",

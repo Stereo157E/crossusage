@@ -345,13 +345,23 @@
   }
 
   function loadStoredCredentials(ctx, suppressMissingWarn) {
+    // Claude Code uses the credentials file on Linux/Windows. Avoid blocking on
+    // an unrelated Secret Service / Credential Manager lookup before reading it.
+    const fileFirst = ctx.app.platform === "linux" || ctx.app.platform === "windows"
+    if (fileFirst) {
+      const fileCredentials = loadFileCredentials(ctx)
+      if (fileCredentials) return fileCredentials
+    }
+
     // Recent Claude Code versions keep the current macOS session in Keychain and
     // can leave a stale credentials file behind, so Keychain must win when valid.
     const keychainCredentials = loadKeychainCredentials(ctx)
     if (keychainCredentials) return keychainCredentials
 
-    const fileCredentials = loadFileCredentials(ctx)
-    if (fileCredentials) return fileCredentials
+    if (!fileFirst) {
+      const fileCredentials = loadFileCredentials(ctx)
+      if (fileCredentials) return fileCredentials
+    }
 
     if (!suppressMissingWarn) {
       ctx.host.log.warn("no credentials found")

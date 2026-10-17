@@ -439,6 +439,10 @@ fn redact_body(body: &str) -> String {
     // Redact JSON values for sensitive keys
     let sensitive_keys = [
         "name",
+        "full_name",
+        "display_name",
+        "profile_user_id",
+        "id",
         "password",
         "token",
         "access_token",
@@ -510,7 +514,7 @@ fn redact_body(body: &str) -> String {
 }
 
 /// Lightweight redaction for plugin log messages (JWT + API key patterns only).
-fn redact_log_message(msg: &str) -> String {
+pub fn redact_log_message(msg: &str) -> String {
     let mut result = redact_google_cookie_pairs(msg);
     if let Ok(email_re) =
         regex_lite::Regex::new(r"[A-Za-z0-9._%+-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}")
@@ -5392,6 +5396,17 @@ mod tests {
             redacted.contains("claude_max"),
             "organization_type should stay visible, got: {redacted}"
         );
+    }
+
+    #[test]
+    fn redact_body_redacts_profile_names_and_reset_credit_identifiers() {
+        let body = r#"{"full_name":"Example Person","display_name":"Example User","profile_user_id":"profile-1234567890","id":"RateLimitResetCredit_1234567890","status":"available","plan_type":"pro"}"#;
+        let redacted = redact_body(body);
+        for value in ["Example Person", "Example User", "profile-1234567890", "RateLimitResetCredit_1234567890"] {
+            assert!(!redacted.contains(value), "unredacted profile field: {redacted}");
+        }
+        assert!(redacted.contains("available"));
+        assert!(redacted.contains("\"plan_type\":\"pro\""));
     }
 
     #[test]

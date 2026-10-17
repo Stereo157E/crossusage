@@ -14,8 +14,8 @@ setup:
     {{ bun }} install --frozen-lockfile
     cargo fetch --locked
 
-# Start the desktop app with hot reload (includes CLI sidecar preparation).
-dev: _sidecar
+# Start the desktop app with hot reload and incremental debug builds.
+dev:
     {{ bun }} run tauri:dev
 
 # Build the native release app and its resources, without installer packaging.

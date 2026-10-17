@@ -56,6 +56,40 @@ function mockClaudeUsage(
   })
 }
 
+describe("platform credential storage", () => {
+  it.each(["linux", "windows"])("reads valid file credentials before keyring on %s", (platform) => {
+    const ctx = makeCtx()
+    ctx.app.platform = platform
+    ctx.host.fs.writeText("~/.claude/.credentials.json", JSON.stringify({
+      claudeAiOauth: { accessToken: "file-token" },
+    }))
+    ctx.host.keychain.readGenericPasswordForCurrentUser.mockImplementation(() => {
+      throw new Error("keyring must not be queried")
+    })
+    mockClaudeUsage(ctx)
+
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.some((line) => line.label === "Session")).toBe(true)
+    expect(ctx.host.http.request.mock.calls[0][0].headers.Authorization).toBe("Bearer file-token")
+    expect(ctx.host.keychain.readGenericPasswordForCurrentUser).not.toHaveBeenCalled()
+    expect(ctx.host.keychain.readGenericPassword).not.toHaveBeenCalled()
+  })
+
+  it("still reads keyring when the Linux credentials file is invalid", () => {
+    const ctx = makeCtx()
+    ctx.app.platform = "linux"
+    ctx.host.fs.writeText("~/.claude/.credentials.json", "invalid json")
+    ctx.host.keychain.readGenericPasswordForCurrentUser.mockReturnValue(JSON.stringify({
+      claudeAiOauth: { accessToken: "keyring-token" },
+    }))
+    mockClaudeUsage(ctx)
+
+    expect(plugin.probe(ctx).lines.some((line) => line.label === "Session")).toBe(true)
+    expect(ctx.host.http.request.mock.calls[0][0].headers.Authorization).toBe("Bearer keyring-token")
+  })
+})
+
 describe("claude plugin", () => {
   it("uses injected provider account credentials before local discovery", async () => {
     const ctx = makeCtx()

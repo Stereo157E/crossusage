@@ -83,3 +83,7 @@
 - Coalesced pointer effects per animation frame and paused dashboard ticks on inactive screens.
 - Added native build commands and optional GDB diagnostics; diagnostic output stays outside the repository.
 - Frontend tests and native release builds passed. Desktop behavior requires compositor-specific verification.
+
+- Reproduced a Claude debug probe timeout with the original credential lookup order; the file-first Linux path returned usage successfully. Added credential precedence and profile-field redaction regressions.
+- Split debug sidecar preparation from release builds and stopped rewriting unchanged generated plugins. Added build-script regression tests; a repeated debug sidecar build reused Cargo artifacts.
+- Git prompt diagnosis: gitstatus rejects the worktreeconfig repository extension in its bundled libgit2. A single-worktree clone can retain its effective settings in the local repository config without enabling that extension.
