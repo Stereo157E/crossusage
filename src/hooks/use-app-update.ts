@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { isTauri } from "@tauri-apps/api/core"
 import { check, type Update } from "@tauri-apps/plugin-updater"
 import { relaunch } from "@tauri-apps/plugin-process"
+import { APP_UPDATES_ENABLED } from "@/lib/app-updates"
 
 export type UpdateStatus =
   | { status: "idle" }
@@ -18,9 +19,10 @@ interface UseAppUpdateReturn {
   checkForUpdates: () => void
 }
 
-/** In Vite dev (`tauri dev`), the updater endpoint often 404s until releases ship `latest.json`. Set `VITE_UPDATER_IN_DEV=true` to test updates locally. Vitest sets `VITE_UPDATER_IN_DEV` via `vite.config.ts` so hook tests still run. */
+/** Development checks additionally require VITE_UPDATER_IN_DEV=true; this cannot override the fork policy. */
 const UPDATER_CHECKS_ENABLED =
-  import.meta.env.PROD || import.meta.env.VITE_UPDATER_IN_DEV === "true"
+  APP_UPDATES_ENABLED &&
+  (import.meta.env.PROD || import.meta.env.VITE_UPDATER_IN_DEV === "true")
 
 export function useAppUpdate(): UseAppUpdateReturn {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ status: "idle" })
@@ -113,6 +115,7 @@ export function useAppUpdate(): UseAppUpdateReturn {
   }, [setStatus])
 
   useEffect(() => {
+    if (!UPDATER_CHECKS_ENABLED || !isTauri()) return
     mountedRef.current = true
     void checkForUpdates()
 
@@ -131,6 +134,7 @@ export function useAppUpdate(): UseAppUpdateReturn {
   }, [checkForUpdates])
 
   const triggerInstall = useCallback(async () => {
+    if (!UPDATER_CHECKS_ENABLED) return
     const update = updateRef.current
     if (!update) return
     if (statusRef.current.status !== "ready") return

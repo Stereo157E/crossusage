@@ -130,7 +130,10 @@ Use a new date/name for each integration branch. Preserve merge ancestry rather
 than replacing the fork's tree or force-resetting it to upstream. Take OpenUsage
 ports through CrossUsage unless intentionally porting a change ourselves.
 
-The application updater still points to barramee27's releases. Before publishing
-fork binaries, disable upstream app updates or configure the fork's release
-endpoint and signing keys. Git synchronization and installed-app updates are
-separate mechanisms.
+In-app binary updates are disabled: the upstream endpoint/key, native updater
+registration and capability are removed, updater artifact generation is off, and
+the frontend does not check or schedule updates. Provider usage refreshes are
+unaffected. To re-enable binary updates, configure a fork-owned release endpoint
+and signing keys, restore registration/permissions, and enable the frontend policy
+in `src/lib/app-updates.ts`. Git synchronization and installed-app updates are
+separate mechanisms. Existing binaries need rebuilding for this change to apply.

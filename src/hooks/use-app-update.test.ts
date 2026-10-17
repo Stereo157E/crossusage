@@ -14,6 +14,9 @@ vi.mock("@tauri-apps/plugin-process", () => ({
   relaunch: relaunchMock,
 }))
 
+// Retain coverage of the upstream updater for a future fork-owned release channel.
+vi.mock("@/lib/app-updates", () => ({ APP_UPDATES_ENABLED: true }))
+
 import { useAppUpdate } from "@/hooks/use-app-update"
 
 declare global {

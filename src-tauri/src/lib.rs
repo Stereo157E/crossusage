@@ -1461,8 +1461,8 @@ pub fn run() {
                 panel::show_panel(app.handle());
             }
 
-            app.handle()
-                .plugin(tauri_plugin_updater::Builder::new().build())?;
+            // This fork has no signed update channel yet. Do not register the
+            // updater: upstream binaries must not replace this fork's changes.
 
             // Register global shortcut from stored settings
             #[cfg(desktop)]

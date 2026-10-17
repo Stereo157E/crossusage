@@ -113,6 +113,10 @@ Build from clone: `cargo build -p crossusage-cli`. If plugins are missing, use `
 
 ## Develop
 
+This fork currently uses source builds for updates. In-app binary updates are
+disabled until a fork-owned release channel and signing keys are configured.
+Provider usage refreshes continue normally.
+
 **Requirements:** [Bun](https://bun.sh), Rust, platform deps for [Tauri v2](https://v2.tauri.app/start/prerequisites/).
 
 With [just](https://just.systems), Node.js and npm installed, use the shortcuts below.
