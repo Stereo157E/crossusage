@@ -179,7 +179,7 @@ body,
   padding-top: 10px;
 }
 
-/* Native title bar (Linux/Windows): no arrow spacer above the panel. */
+/* Desktop windows (Linux/Windows): no arrow spacer above the panel. */
 html:not(.tauri-popover) .app-popover-shell {
   padding-top: 0;
 }
@@ -205,6 +205,14 @@ html:not(.tauri-popover) .app-popover-shell {
 html:not(.tauri-popover) .app-panel-surface {
   flex: 1;
   min-height: 0;
+}
+
+/* The Linux compositor owns the outer corners and shadow. Paint the entire
+ * webview, including behind translucent glass effects, when tiled or resized. */
+html.tauri-linux,
+html.tauri-linux body,
+html.tauri-linux #root {
+  background: var(--card);
 }
 
 .tray-arrow {
@@ -590,6 +598,13 @@ html:not(.tauri-popover) .app-panel-surface {
   }
 }
 
+/* Apply after glass-theme rules: the compositor owns Linux window chrome. */
+html.tauri-linux .app-panel-surface {
+  border-radius: 0;
+  box-shadow: none;
+  border: 0;
+}
+
 /* Hide scrollbar track globally */
 .scrollbar-none {
   scrollbar-width: none;          /* Firefox */
@@ -681,4 +696,3 @@ html.tauri-popover body {
     opacity: 0.35;
   }
 }
-

@@ -34,13 +34,15 @@ console.warn = (...args: unknown[]) => {
 
 /**
  * macOS only: undecorated tray popover look (transparent html/body; see `index.css`).
- * Linux/Windows use native title bar from Rust `panel_*::init` — no blur-to-hide.
+ * Linux uses an opaque compositor-managed window; Windows uses native chrome.
  */
 if (isTauri()) {
   void (async () => {
     const platform = await invoke<string>("get_platform");
     if (platform === "macos") {
       document.documentElement.classList.add("tauri-popover");
+    } else if (platform === "linux") {
+      document.documentElement.classList.add("tauri-linux");
     }
   })();
 }

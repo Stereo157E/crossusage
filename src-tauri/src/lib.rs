@@ -16,7 +16,7 @@ mod log_path;
 mod os_diagnostics;
 mod support_bundle;
 mod usage_alert_sound;
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 mod popover_platform;
 mod tray;
 #[cfg(target_os = "linux")]
@@ -357,6 +357,11 @@ pub struct ProbeBatchComplete {
 
 #[tauri::command]
 fn init_panel(app_handle: tauri::AppHandle) {
+    // Linux initializes once during setup, before the window is first shown.
+    // React mounts (including StrictMode/remounts) must not register more close handlers.
+    if cfg!(target_os = "linux") {
+        return;
+    }
     panel::init(&app_handle).expect("Failed to initialize panel");
 }
 
@@ -438,9 +443,8 @@ fn set_liquid_glass_enabled(app_handle: tauri::AppHandle, enabled: bool) -> Resu
         }
     }
 
-    // Linux: transparency is compositor-dependent (KWin/Mutter compositing must be
-    // active). No native API needed – the transparent Tauri window + CSS
-    // backdrop-filter handles it when a compositor is running.
+    // Linux: glass is a CSS effect inside the opaque desktop window.
+    // No native transparency or window-chrome changes are needed.
 
     Ok(())
 }
@@ -1344,7 +1348,10 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([
-                    Target::new(TargetKind::Stdout),
+                    // Keep release launches quiet; detailed diagnostics remain in the log file.
+                    Target::new(TargetKind::Stderr).filter(|metadata| {
+                        cfg!(debug_assertions) || metadata.level() <= log::Level::Warn
+                    }),
                     Target::new(TargetKind::LogDir { file_name: None }),
                 ])
                 .max_file_size(10_000_000) // 10 MB
