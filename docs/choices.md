@@ -88,3 +88,13 @@
 - Antigravity CLI quota: match the desktop `agy` path by preferring `retrieveUserQuotaSummary` and rendering Gemini session/weekly lines first, then Claude and GPT session/weekly lines. Keep older `loadCodeAssist` / model quota calls as compatibility fallback only.
 - Antigravity remote quota: prefer `retrieveUserQuotaSummary` on the daily Cloud Code host, then the standard Cloud Code host; render its four stable group/window buckets rather than individual model pools. Retain legacy model calls only when no summary is returned.
 - Antigravity credential discovery: use `host.fs.firstExistingAppSupport` for the platform-native VS Code state database; do not infer credentials from `.gemini/antigravity` conversation files. On Windows, read `agy`'s Go-keyring target as raw UTF-8 bytes; refresh only after Cloud Code returns `401`/`403`.
+
+## 2026-10-17
+
+- Linux window: opaque, undecorated, resizable from creation through the platform config; let the compositor own placement, outer rounding and shadows. Keep Escape/tray controls. No forced size/decoration changes during frontend init.
+- Prefer Wayland through GDK's supported backend-order API; respect explicit GDK_BACKEND. Do not hardcode LD_PRELOAD or global Hyprland settings. Validate a native build before changing AppImage tooling.
+- Release stderr: Warn/Error only; keep detailed file logs and verbose debug builds. Cursor's zero-argument host API is fixed independently of expired credentials.
+- Rendering follow-up: preserve the current animation design while coalescing pointer-driven layout/style updates per frame; respect system reduced motion and cancel stale callbacks. Pause Modern dashboard clock on other screens. Do not introduce unconditional graphics-driver environment overrides without reproducing their need.
+- Diagnostics: collect thread stacks without local variables, argument values or full memory dumps. Do not infer a crash cause from the last warning alone.
+- justfile: default build means native release plus resources, with installer packaging exposed separately as bundle. Dev/build prepare the CLI sidecar. Use npm-executed Bun for existing hooks without requiring a global Bun installation; keep the runner overridable and inherit Cargo/graphics environment choices.
+- Fork maintenance: use main for fork changes and merge upstream/feat/linux-windows-native-support through dedicated integration branches. Keep application updates separate from Git synchronization.

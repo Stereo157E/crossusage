@@ -75,3 +75,11 @@
 - Antigravity CLI quota UI: updated `plugins/antigravity-cli` to call Cloud Code `retrieveUserQuotaSummary` first and expose the same four summary lines as desktop Antigravity; left `antigravity-ide` unchanged.
 - Antigravity quota UI: Cloud Code now uses `retrieveUserQuotaSummary`; manifest and parser expose Gemini session/weekly lines first, then Claude and GPT session/weekly lines.
 - Antigravity Windows auth fix: resolve existing `Antigravity IDE`/legacy paths through `firstExistingAppSupport` (`%APPDATA%` on Windows), skipping nonexistent macOS paths and their SQLite warnings; read `gemini:antigravity` as raw Go-keyring UTF-8 bytes and refresh once after an auth failure.
+
+## 2026-10-17
+
+- Integrated opaque, resizable Linux windows with compositor-managed placement and rounding.
+- Fixed the zero-argument Cursor host binding and synchronized the generated Nightly plugin.
+- Coalesced pointer effects per animation frame and paused dashboard ticks on inactive screens.
+- Added native build commands and optional GDB diagnostics; diagnostic output stays outside the repository.
+- Frontend tests and native release builds passed. Desktop behavior requires compositor-specific verification.
