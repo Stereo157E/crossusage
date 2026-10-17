@@ -102,3 +102,4 @@
 
 - Development: prepare the CLI sidecar in the debug profile from the shared Tauri before-dev hook. Keep release as the packaging script default; preserve unchanged generated plugin and sidecar timestamps so Cargo can reuse its native cache.
 - Claude credentials: prefer the native file store on Linux/Windows; retain Keychain precedence on macOS. Log redacted error details when a desktop probe fails.
+- Local Linux installation: use the native release GUI in `~/.local/bin`, with CLI and bundled resources under `~/.local/lib/crossusage`. Retain the application identifier and data directory; replace the AppImage launcher with a desktop entry labeled `CrossUsage (Fork)`.
