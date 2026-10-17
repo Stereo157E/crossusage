@@ -115,6 +115,33 @@ Build from clone: `cargo build -p crossusage-cli`. If plugins are missing, use `
 
 **Requirements:** [Bun](https://bun.sh), Rust, platform deps for [Tauri v2](https://v2.tauri.app/start/prerequisites/).
 
+With [just](https://just.systems), Node.js and npm installed, use the shortcuts below.
+The recipes use `npm exec --yes --package=bun -- bun` for Bun-dependent hooks, so
+a global Bun installation is optional (the first use may download Bun). With a
+global installation, use `just bun=bun dev` or `just bun=bun setup`.
+
+| Command | Action |
+| --- | --- |
+| `just` | List commands |
+| `just setup` | Install frontend dependencies and fetch Rust dependencies with lockfiles |
+| `just dev` | Desktop development with hot reload; prepare the CLI sidecar first |
+| `just build` | Native release build, frontend and bundled resources |
+| `just run` | Start the existing `target/release/crossusage` build |
+| `just diagnose` | Linux GDB capture; press Ctrl+C once if the app freezes |
+| `just test` | Frontend tests; optional Vitest arguments |
+| `just test-rust` | Rust core and CLI tests; optional Cargo arguments |
+| `just cli list` | Run a CLI command from source |
+| `just bundle` | Platform installer bundles via Tauri; optional Tauri build arguments |
+
+`just build` does not require updater signing keys. `just bundle` uses the existing
+Tauri packaging configuration and its platform/signing requirements. Recipes
+inherit your environment, including `CARGO_HOME`, `CARGO_NET_OFFLINE` and explicit
+graphics overrides. The Linux diagnostic recipe uses its existing clean-launch
+environment. The development and build hooks regenerate bundled plugins,
+including the generated Cursor Nightly source.
+
+The existing commands remain available:
+
 ```bash
 bun install
 bun run bundle:plugins
