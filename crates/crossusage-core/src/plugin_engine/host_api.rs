@@ -1153,7 +1153,7 @@ fn inject_cursor_paths<'js>(
     let plugin_id = base_plugin_id.to_string();
     paths_obj.set(
         "resolveStateDb",
-        Function::new(ctx.clone(), move |_ctx: Ctx<'_>, ()| -> Option<String> {
+        Function::new(ctx.clone(), move || -> Option<String> {
             crate::cursor_paths::resolve_cursor_state_db_for_plugin_id(&plugin_id)
                 .map(|p| p.to_string_lossy().to_string())
         })?,
@@ -4329,6 +4329,27 @@ fn expand_path(path: &str) -> String {
 mod tests {
     use super::*;
     use rquickjs::{Context, Function, Object, Runtime};
+
+    #[test]
+    fn cursor_paths_resolve_state_db_accepts_no_javascript_arguments() {
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            for plugin_id in ["cursor", "cursor-nightly", "unsupported"] {
+                let host = Object::new(ctx.clone()).expect("host");
+                inject_cursor_paths(&ctx, &host, plugin_id).expect("inject cursor paths");
+                ctx.globals().set("host", host).expect("expose host");
+
+                // Use the same zero-argument call as plugins/cursor/plugin.js.
+                let actual: Option<String> = ctx
+                    .eval("host.cursorPaths.resolveStateDb()")
+                    .expect("resolveStateDb must not require a dummy argument");
+                let expected = crate::cursor_paths::resolve_cursor_state_db_for_plugin_id(plugin_id)
+                    .map(|path| path.to_string_lossy().to_string());
+                assert_eq!(actual, expected);
+            }
+        });
+    }
 
     fn encrypt_aes_256_gcm_envelope_for_test(key: &[u8], plaintext: &str) -> String {
         let iv = [7_u8; 16];
