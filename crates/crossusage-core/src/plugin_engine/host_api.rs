@@ -14,8 +14,6 @@ use std::collections::{HashMap, HashSet};
 #[cfg(test)]
 use std::collections::VecDeque;
 
-#[cfg(unix)]
-use users::os::unix::UserExt;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -780,12 +778,7 @@ fn home_dir() -> Option<std::path::PathBuf> {
             {
                 std::env::var_os("USERPROFILE").map(std::path::PathBuf::from)
             }
-            #[cfg(all(unix, not(windows)))]
-            {
-                let uid = users::get_current_uid();
-                users::get_user_by_uid(uid).map(|user| user.home_dir().to_path_buf())
-            }
-            #[cfg(not(any(windows, unix)))]
+            #[cfg(not(windows))]
             {
                 None
             }
@@ -824,7 +817,7 @@ fn dbus_session_bus_address() -> Option<String> {
             return Some(trimmed.to_string());
         }
     }
-    let uid = users::get_current_uid();
+    let uid = unsafe { libc::getuid() };
     let bus_path = format!("/run/user/{uid}/bus");
     if std::path::Path::new(&bus_path).exists() {
         return Some(format!("unix:path={bus_path}"));
@@ -878,6 +871,7 @@ fn windows_go_keyring_target(service: &str, user: &str) -> String {
 
 /// `zalando/go-keyring` writes raw UTF-8 bytes to Windows Credential Manager.
 /// Rust `keyring::Entry::get_password` / `set_password` use UTF-16LE instead.
+#[cfg(any(target_os = "windows", test))]
 fn decode_windows_go_keyring_secret(secret: Vec<u8>) -> Result<String, String> {
     let value = String::from_utf8(secret)
         .map_err(|_| "go-keyring credential is not valid UTF-8".to_string())?;
@@ -891,6 +885,7 @@ fn decode_windows_go_keyring_secret(secret: Vec<u8>) -> Result<String, String> {
 }
 
 /// Decode a blob written by Rust `keyring` `set_password` (UTF-16LE, no BOM).
+#[cfg(any(target_os = "windows", test))]
 fn decode_windows_keyring_utf16le_secret(secret: &[u8]) -> Result<String, String> {
     if secret.is_empty() {
         return Err("UTF-16LE credential is empty".to_string());
@@ -914,6 +909,7 @@ fn decode_windows_keyring_utf16le_secret(secret: &[u8]) -> Result<String, String
 }
 
 /// Prefer go-keyring UTF-8, then keyring-crate UTF-16LE (same CM target can be either).
+#[cfg(any(target_os = "windows", test))]
 fn decode_windows_credential_blob(secret: Vec<u8>) -> Result<String, String> {
     match decode_windows_go_keyring_secret(secret.clone()) {
         Ok(value) => Ok(value),
@@ -2352,13 +2348,9 @@ pub fn ccusage_supported_plugin_id(plugin_id: &str) -> bool {
 }
 
 fn ccusage_since_days_ago(days: i64) -> String {
-    let d = time::OffsetDateTime::now_utc().date() - time::Duration::days(days);
-    format!(
-        "{:04}{:02}{:02}",
-        d.year(),
-        u8::from(d.month()),
-        d.day()
-    )
+    (chrono::Utc::now().date_naive() - chrono::Duration::days(days))
+        .format("%Y%m%d")
+        .to_string()
 }
 
 /// After a successful probe, ingest ccusage daily rows for plugins that do not run ccusage in JS.
@@ -3144,13 +3136,9 @@ fn inject_cursor_logs<'js>(
                     })
                     .unwrap_or_default();
                 let since = if since.is_empty() {
-                    let d = time::OffsetDateTime::now_utc().date() - time::Duration::days(30);
-                    format!(
-                        "{:04}{:02}{:02}",
-                        d.year(),
-                        u8::from(d.month()),
-                        d.day()
-                    )
+                    (chrono::Utc::now().date_naive() - chrono::Duration::days(30))
+                        .format("%Y%m%d")
+                        .to_string()
                 } else {
                     since
                 };
@@ -4292,12 +4280,7 @@ pub fn patch_chromium_cookies_wrapper(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Resu
 }
 
 fn iso_now() -> String {
-    time::OffsetDateTime::now_utc()
-        .format(&time::format_description::well_known::Rfc3339)
-        .unwrap_or_else(|err| {
-            log::error!("nowIso format failed: {}", err);
-            "1970-01-01T00:00:00Z".to_string()
-        })
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
 fn path_has_parent_segment(path: &str) -> bool {

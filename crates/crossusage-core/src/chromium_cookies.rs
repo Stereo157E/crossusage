@@ -187,7 +187,7 @@ fn linux_libsecret_password(application: &str) -> Result<String, String> {
             cmd.env("DBUS_SESSION_BUS_ADDRESS", addr);
         }
     } else {
-        let uid = users::get_current_uid();
+        let uid = unsafe { libc::getuid() };
         let bus_path = format!("/run/user/{uid}/bus");
         if Path::new(&bus_path).exists() {
             cmd.env("DBUS_SESSION_BUS_ADDRESS", format!("unix:path={bus_path}"));
