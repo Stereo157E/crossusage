@@ -967,6 +967,14 @@ fn fetch_usage_events_day(
     }
 }
 
+fn cursor_history_day_ready_to_publish(
+    date: NaiveDate,
+    today: NaiveDate,
+    day: Option<&CursorHistoryDay>,
+) -> bool {
+    day.is_some_and(|d| date >= today || d.is_complete)
+}
+
 fn fetch_cursor_usage_rows_via_events(
     plugin_id: &str,
     since: &str,
@@ -1062,10 +1070,12 @@ fn fetch_cursor_usage_rows_via_events(
         save_cursor_history_store(&user_id, &cached);
     }
 
-    // Upstream #1373: only publish once every day in the requested window is present.
+    // Upstream #1373: only publish once every requested day is present.
+    // Past days must be complete so a failed yesterday refetch falls back to CSV
+    // instead of keeping the in-progress snapshot from when that day was still today.
     for date in &dates {
         let day_key = date.format("%Y-%m-%d").to_string();
-        if !cached.contains_key(&day_key) {
+        if !cursor_history_day_ready_to_publish(*date, today_date, cached.get(&day_key)) {
             bail!("usage history backfill incomplete for window {since}-{until}");
         }
     }
@@ -1294,5 +1304,41 @@ mod tests {
         assert_eq!(page.events[0].output_tokens, 200);
         assert_eq!(page.events[1].model, "default");
         assert_eq!(page.events[1].input_no_cache, 0);
+    }
+
+    #[test]
+    fn incomplete_yesterday_is_not_ready_to_publish() {
+        let today = NaiveDate::from_ymd_opt(2026, 10, 19).unwrap();
+        let yesterday = today - chrono::Duration::days(1);
+        let older = today - chrono::Duration::days(2);
+        let incomplete = CursorHistoryDay {
+            models: HashMap::new(),
+            is_complete: false,
+        };
+        let complete = CursorHistoryDay {
+            models: HashMap::new(),
+            is_complete: true,
+        };
+        assert!(!cursor_history_day_ready_to_publish(
+            yesterday,
+            today,
+            Some(&incomplete)
+        ));
+        assert!(cursor_history_day_ready_to_publish(
+            yesterday,
+            today,
+            Some(&complete)
+        ));
+        assert!(!cursor_history_day_ready_to_publish(
+            older,
+            today,
+            Some(&incomplete)
+        ));
+        assert!(cursor_history_day_ready_to_publish(
+            today,
+            today,
+            Some(&incomplete)
+        ));
+        assert!(!cursor_history_day_ready_to_publish(yesterday, today, None));
     }
 }
