@@ -1,6 +1,7 @@
 //! Read decrypted Chromium-family cookies from the local profile Cookies SQLite DB.
 //!
 //! Linux/macOS: OSCrypt `v10`/`v11` AES-128-CBC. Windows DPAPI/`v20` is not supported.
+#![cfg_attr(windows, allow(dead_code, unused_imports))]
 
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use pbkdf2::pbkdf2_hmac;

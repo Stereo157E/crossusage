@@ -1149,7 +1149,7 @@ fn inject_cursor_paths<'js>(
     let plugin_id = base_plugin_id.to_string();
     paths_obj.set(
         "resolveStateDb",
-        Function::new(ctx.clone(), move |_ctx: Ctx<'_>, ()| -> Option<String> {
+        Function::new(ctx.clone(), move || -> Option<String> {
             crate::cursor_paths::resolve_cursor_state_db_for_plugin_id(&plugin_id)
                 .map(|p| p.to_string_lossy().to_string())
         })?,
@@ -4621,6 +4621,36 @@ mod tests {
             assert!(
                 !message.contains("2 where expected"),
                 "single-arg call should reach the keychain implementation, got: {}",
+                message
+            );
+        });
+    }
+
+    #[test]
+    fn cursor_paths_resolve_state_db_accepts_zero_args_from_js() {
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            let app_data = std::env::temp_dir();
+            inject_host_api(&ctx, "cursor", "cursor", None, &app_data, "0.0.0")
+                .expect("inject host api");
+
+            let message: String = ctx
+                .eval(
+                    r#"
+                    try {
+                        var res = __openusage_ctx.host.cursorPaths.resolveStateDb();
+                        res === null || typeof res === "string" ? "ok" : "unexpected:" + typeof res;
+                    } catch (e) {
+                        String(e);
+                    }
+                    "#,
+                )
+                .expect("js eval");
+
+            assert_eq!(
+                message, "ok",
+                "zero-arg cursorPaths.resolveStateDb() should succeed without arity TypeError, got: {}",
                 message
             );
         });

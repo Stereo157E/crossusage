@@ -6,8 +6,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-static PLUGINS_ROOT: Dir<'_> =
-    include_dir!("$CARGO_MANIFEST_DIR/../../src-tauri/resources/bundled_plugins");
+static PLUGINS_ROOT: Dir<'_> = include_dir!("$OUT_DIR/bundled_plugins");
 
 fn materialize_dir(dir: &Dir<'_>, plugins_dest: &Path) -> io::Result<()> {
     for entry in dir.entries() {
