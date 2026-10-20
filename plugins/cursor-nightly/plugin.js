@@ -163,6 +163,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
   function writeStateValue(ctx, key, value) {
     try {
       const dbPath = getCursorDbPath(ctx)
+      // Escape single quotes in value for SQL
       const escaped = String(value).replace(/'/g, "''")
       const sql =
         "INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('" +
@@ -290,6 +291,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
 
   function buildCrossusageDevMockProbeOutput(ctx) {
     ctx.host.log.info("crossusage dev mock: skipping Cursor API (no network)")
+    // Labels must match plugin.json manifest lines so tray + overview filters never go empty.
     return {
       plan: "Dev mock",
       lines: [
@@ -429,6 +431,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
         return null
       }
 
+      // Check if server wants us to logout
       if (body.shouldLogout === true) {
         ctx.host.log.error("refresh response indicates shouldLogout=true")
         throw "Session expired. " + LOGIN_HINT
@@ -440,9 +443,12 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
         return null
       }
 
+      // Persist updated access token to source where auth was loaded from.
       persistAccessToken(ctx, source, newAccessToken)
       ctx.host.log.info("refresh succeeded, token persisted")
 
+      // Note: Cursor refresh returns access_token which is used as both
+      // access and refresh token in some flows
       return newAccessToken
     } catch (e) {
       if (typeof e === "string") throw e
@@ -637,6 +643,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     if (!stripe) return null
     var customerBalanceCents = Number(stripe.customerBalance)
     if (!Number.isFinite(customerBalanceCents)) return null
+    // Stripe stores customer credits as a negative balance.
     return customerBalanceCents < 0 ? Math.abs(customerBalanceCents) : 0
   }
 
@@ -683,11 +690,26 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     const hasPlanUsageLimit = hasPlanUsage && Number.isFinite(limitN)
     const planUsageLimitMissing = hasPlanUsage && !hasPlanUsageLimit
     const hasTotalUsagePercent = hasPlanUsage && Number.isFinite(pctN)
+    const autoN = hasPlanUsage ? readFiniteNumber(pu.autoPercentUsed) : NaN
+    const apiN = hasPlanUsage ? readFiniteNumber(pu.apiPercentUsed) : NaN
+    const totalSpendN = hasPlanUsage ? readFiniteNumber(pu.totalSpend) : NaN
+    const remainingN = hasPlanUsage ? readFiniteNumber(pu.remaining) : NaN
+    const defaultLimit = Number.isFinite(limitN) ? limitN : 0
+    const spent = Number.isFinite(totalSpendN)
+      ? totalSpendN
+      : (defaultLimit - (Number.isFinite(remainingN) ? remainingN : defaultLimit))
+    const hasModelPools =
+      Number.isFinite(autoN) &&
+      Number.isFinite(apiN) &&
+      autoN >= 0 &&
+      apiN >= 0 &&
+      (autoN > 0 || apiN > 0 || spent === 0)
     return {
       hasPlanUsage: hasPlanUsage,
       hasPlanUsageLimit: hasPlanUsageLimit,
       planUsageLimitMissing: planUsageLimitMissing,
       hasTotalUsagePercent: hasTotalUsagePercent,
+      hasModelPools: hasModelPools,
       pu: pu,
     }
   }
@@ -708,15 +730,16 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     }
 
     const normalizedPlanName = typeof planName === "string"
-      ? planName.toLowerCase()
+      ? planName.trim().toLowerCase()
       : ""
 
     const flags = getConnectUsageMetricFlags(usage)
     const hasPlanUsageLimit = flags.hasPlanUsageLimit
     const hasTotalUsagePercent = flags.hasTotalUsagePercent
+    const hasModelPools = flags.hasModelPools
     const pu = flags.pu
 
-    if (!hasPlanUsageLimit && !hasTotalUsagePercent) {
+    if (!hasPlanUsageLimit && !hasTotalUsagePercent && !hasModelPools) {
       throw "Total usage limit missing from API response."
     }
 
@@ -774,7 +797,20 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
       (su && typeof su.pooledLimit === "number" && su.pooledLimit > 0)
     )
 
-    if (isTeamAccount) {
+    if (isTeamAccount && hasModelPools) {
+      // Modern Teams seats still report the old $20 allowance. Structured pool data wins;
+      // never synthesize a total from stale dollars when Cursor omits totalPercentUsed.
+      if (hasTotalUsagePercent) {
+        lines.push(ctx.line.progress({
+          label: "Total usage",
+          used: pu.totalPercentUsed,
+          limit: 100,
+          format: { kind: "percent" },
+          resetsAt: ctx.util.toIso(usage.billingCycleEnd),
+          periodDurationMs: billingPeriodMs,
+        }))
+      }
+    } else if (isTeamAccount) {
       if (!hasPlanUsageLimit) {
         return null
       }
@@ -786,6 +822,8 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
         resetsAt: ctx.util.toIso(usage.billingCycleEnd),
         periodDurationMs: billingPeriodMs,
       }))
+      // Dollar total usage from Connect is authoritative for team plans; still mark
+      // locally-derived bonus/export spend as estimated below.
 
       if (typeof pu.bonusSpend === "number" && pu.bonusSpend > 0) {
         lines.push(ctx.line.text({
@@ -1297,6 +1335,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
         source: "cursor_transcripts",
         daily: daily,
       })
+    } catch (e) { /* ignore */ }
   }
 
   function formatCompactTokens(n) {
@@ -1332,11 +1371,13 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
       result.lines.push(ctx.line.text({
         label: "MTD usage",
         value: value,
+        // Costs from token×price tables are estimates (#886); tokens come from the export.
         subtitle: hasCost
           ? "Estimated spend from Cursor usage export"
           : "From Cursor dashboard export (billing data)",
       }))
     } catch (e) {
+      // Never drop primary Connect usage when export enrichment fails (#948).
       ctx.host.log.warn("usage export MTD attach failed: " + String(e))
     }
     return result
@@ -1372,6 +1413,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
         daily: daily,
       })
     } catch (e) {
+      // Log only — never clear primary Connect usage (#948).
       ctx.host.log.warn("cursor billing daily ingest failed: " + String(e))
     }
   }
@@ -1497,12 +1539,14 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
 
     const nowMs = Date.now()
 
+    // Proactively refresh if token is expired or about to expire
     if (needsRefresh(ctx, accessToken, nowMs)) {
       ctx.host.log.info("token needs refresh (expired or expiring soon)")
       let refreshed = null
       try {
         refreshed = refreshToken(ctx, refreshTokenValue, authSource)
       } catch (e) {
+        // If refresh fails but we have an access token, try it anyway
         ctx.host.log.warn("refresh failed but have access token, will try: " + String(e))
         if (!accessToken) throw e
       }
@@ -1561,6 +1605,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
       )
 
       var connectDetail = null
+      // Connect/gRPC-Web sometimes returns 400/403 while other endpoints or cursor.com still work.
       if (usageResp.status === 400 || usageResp.status === 403) {
         connectDetail = extractConnectUsageErrorDetail(ctx, usageResp.bodyText)
         ctx.host.log.warn(
@@ -1644,6 +1689,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
       throw "Usage response invalid. Try again later."
     }
 
+    // Fetch plan info early (needed for request-based fallback detection)
     let planName = ""
     let planInfoUnavailable = false
     try {
@@ -1665,19 +1711,20 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     }
 
     const normalizedPlanName = typeof planName === "string"
-      ? planName.toLowerCase()
+      ? planName.trim().toLowerCase()
       : ""
 
-    const hasPlanUsage = !!usage.planUsage
-    const hasPlanUsageLimit = hasPlanUsage &&
-      typeof usage.planUsage.limit === "number" &&
-      Number.isFinite(usage.planUsage.limit)
-    const planUsageLimitMissing = hasPlanUsage && !hasPlanUsageLimit
-    const hasTotalUsagePercent = hasPlanUsage &&
-      typeof usage.planUsage.totalPercentUsed === "number" &&
-      Number.isFinite(usage.planUsage.totalPercentUsed)
+    const probeFlags = getConnectUsageMetricFlags(usage)
+    const hasPlanUsage = probeFlags.hasPlanUsage
+    const hasPlanUsageLimit = probeFlags.hasPlanUsageLimit
+    const planUsageLimitMissing = probeFlags.planUsageLimitMissing
+    const hasTotalUsagePercent = probeFlags.hasTotalUsagePercent
+    const hasModelPools = probeFlags.hasModelPools
+    const planUsageUnusable = !hasPlanUsage || (planUsageLimitMissing && !hasModelPools)
 
-    const needsRequestBasedFallback = usage.enabled !== false && (!hasPlanUsage || planUsageLimitMissing) && (
+    // Enterprise and some Team request-based accounts can return no planUsage
+    // or a planUsage object without limit from the Connect API.
+    const needsRequestBasedFallback = usage.enabled !== false && planUsageUnusable && (
       normalizedPlanName === "enterprise" ||
       normalizedPlanName === "team"
     )
@@ -1691,7 +1738,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     }
 
     const needsFallbackWithoutPlanInfo = usage.enabled !== false &&
-      (!hasPlanUsage || planUsageLimitMissing) &&
+      planUsageUnusable &&
       !hasTotalUsagePercent &&
       !normalizedPlanName &&
       planInfoUnavailable
@@ -1700,7 +1747,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
       return buildUnknownRequestBasedResult(ctx, accessToken, planName)
     }
 
-    if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent) {
+    if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent && !hasModelPools) {
       ctx.host.log.warn("planUsage.limit missing, attempting REST usage API fallback")
       try {
         return buildUnknownRequestBasedResult(ctx, accessToken, planName)
@@ -1709,6 +1756,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
       }
     }
 
+    // Team plans may omit `enabled` even with valid plan usage data.
     if (usage.enabled === false || !usage.planUsage) {
       throw "No active Cursor subscription."
     }

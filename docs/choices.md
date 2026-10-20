@@ -1,5 +1,14 @@
 # Choices
 
+## 2026-10-19
+
+- **1.6.1 (PATCH):** OpenUsage **v0.7.14 + v0.7.15** ports + build/size optimization pass ([VERSIONING.md](./VERSIONING.md)).
+- **OpenUsage v0.7.15 port:** Ported Codex dashboard link (`chatgpt.com/settings/usage`), Gemini `-n` none-effort pricing alias (`compile_alias_pattern` lookahead handling in `regex-lite`), Codex `codex-auto-review` $0 cost since `2026-10-06T00:00:00Z` across Codex + Pi scanners, OpenCode Go `__drizzle_migrations` check (`20260805200742_import_legacy_credentials`), Ollama `/api/balance` dollar allowance + `Purchased Credits`, Claude `Rate Limit Resets` hourly polling cache (`3600000ms`), and Cursor incremental day-by-day paged `get-filtered-usage-events` history cache (`cursor-usage-history/*.json`) with CSV fallback.
+
+## 2026-10-16
+
+- **OpenUsage v0.7.14 port:** Ported Codex plan names (`Pro 100`/`Pro 200`/`Pro 500`), Cursor structured team usage pools (`hasModelPools`), and OpenCode Go sub-1% session reset countdowns (dropping 5h placeholder resets and setting `sessionStartSignal: "missingResetDate"`). Skipped macOS `xswap`/SwiftUI-only changes (#1322, #1338, #1343, #1345, #1346, #1349). Hold release until OpenUsage v0.7.15 stable ships.
+
 ## 2026-10-05
 
 - **1.6.0:** MINOR. The base account label is a CrossUsage feature ([VERSIONING.md](./VERSIONING.md)). OpenUsage **v0.7.13** rides along (would be PATCH alone).
@@ -88,3 +97,6 @@
 - Antigravity CLI quota: match the desktop `agy` path by preferring `retrieveUserQuotaSummary` and rendering Gemini session/weekly lines first, then Claude and GPT session/weekly lines. Keep older `loadCodeAssist` / model quota calls as compatibility fallback only.
 - Antigravity remote quota: prefer `retrieveUserQuotaSummary` on the daily Cloud Code host, then the standard Cloud Code host; render its four stable group/window buckets rather than individual model pools. Retain legacy model calls only when no summary is returned.
 - Antigravity credential discovery: use `host.fs.firstExistingAppSupport` for the platform-native VS Code state database; do not infer credentials from `.gemini/antigravity` conversation files. On Windows, read `agy`'s Go-keyring target as raw UTF-8 bytes; refresh only after Cloud Code returns `401`/`403`.
+
+
+

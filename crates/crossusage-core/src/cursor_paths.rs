@@ -1,6 +1,5 @@
 //! Cursor Stable vs Cursor Nightly install paths (separate `state.vscdb` per app).
 
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use rusqlite::{Connection, OpenFlags};
@@ -102,12 +101,6 @@ fn read_sqlite_value(db_path: &Path, key: &str) -> Option<String> {
 pub fn cursor_state_db_has_auth(db_path: &Path) -> bool {
     read_sqlite_value(db_path, ACCESS_KEY).is_some()
         || read_sqlite_value(db_path, REFRESH_KEY).is_some()
-}
-
-fn path_has_app_dir(db_path: &Path, app_name: &str) -> bool {
-    db_path
-        .components()
-        .any(|c| c.as_os_str() == OsStr::new(app_name))
 }
 
 #[cfg(test)]

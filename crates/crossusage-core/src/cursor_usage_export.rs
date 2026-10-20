@@ -6,15 +6,21 @@ use chrono::{DateTime, Datelike, Local, NaiveDate, TimeZone, Utc};
 use rusqlite::{Connection, OpenFlags};
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use crate::log_usage_types::TokenBreakdown;
+use crate::model_pricing::default_pricing;
+
 const REFRESH_URL: &str = "https://api2.cursor.sh/oauth/token";
 const CLIENT_ID: &str = "KbZUR41cY7W6zRSdpSUJ7I7mLYBKOCmB";
 const EXPORT_URL: &str = "https://cursor.com/api/dashboard/export-usage-events-csv";
+const USAGE_EVENTS_URL: &str = "https://cursor.com/api/dashboard/get-filtered-usage-events";
+const USAGE_EVENTS_PAGE_SIZE: usize = 1000;
+const SPEND_HISTORY_BUDGET: Duration = Duration::from_secs(20);
 const ACCESS_KEY: &str = "cursorAuth/accessToken";
 const REFRESH_KEY: &str = "cursorAuth/refreshToken";
 const REFRESH_BUFFER_MS: i64 = 5 * 60 * 1000;
@@ -223,8 +229,7 @@ pub fn query_daily_billing(
     } else {
         resolve_date_range(since, until)?
     };
-    let csv_text = fetch_csv_cached(plugin_id, &since, &until)?;
-    let rows = parse_usage_csv(&csv_text, &since, &until)?;
+    let rows = load_cursor_usage_rows_with_events_fallback(plugin_id, &since, &until, None)?;
     let by_day = aggregate_by_day(&rows);
     let mut out: Vec<DailyBillingRow> = by_day
         .into_iter()
@@ -379,9 +384,7 @@ fn fetch_cursor_month_to_date_totals_uncached(plugin_id: &str) -> Option<CursorM
         return None;
     }
     let (since, until) = month_to_date_range_local().ok()?;
-    let (start_ms, end_ms) = to_epoch_range_ms(&since, &until).ok()?;
-    let csv_text = download_cursor_usage_csv_for_plugin(plugin_id, start_ms, end_ms).ok()?;
-    let rows = parse_usage_csv(&csv_text, &since, &until).ok()?;
+    let rows = load_cursor_usage_rows_with_events_fallback(plugin_id, &since, &until, None).ok()?;
     let agg = sum_csv_rows(&rows);
     Some(CursorMtdTotals {
         total_tokens: agg.total_tokens,
@@ -699,6 +702,439 @@ fn fetch_csv_cached(plugin_id: &str, since: &str, until: &str) -> Result<String>
     Ok(text)
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+struct CursorHistoryTokens {
+    #[serde(default)]
+    input: u64,
+    #[serde(default)]
+    cache_write: u64,
+    #[serde(default)]
+    cache_read: u64,
+    #[serde(default)]
+    output: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CursorHistoryDay {
+    models: HashMap<String, CursorHistoryTokens>,
+    #[serde(default)]
+    is_complete: bool,
+}
+
+impl CursorHistoryDay {
+    fn add(&mut self, model: String, t: CursorHistoryTokens) {
+        let entry = self.models.entry(model).or_default();
+        entry.input += t.input;
+        entry.cache_write += t.cache_write;
+        entry.cache_read += t.cache_read;
+        entry.output += t.output;
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CursorHistoryStoreFile {
+    schema_version: u32,
+    user_id: String,
+    days: HashMap<String, CursorHistoryDay>,
+}
+
+const HISTORY_STORE_SCHEMA_VERSION: u32 = 2;
+
+fn cursor_history_store_path(user_id: &str) -> Option<PathBuf> {
+    let base = dirs::data_local_dir().or_else(|| dirs::home_dir().map(|h| h.join(".local/share")))?;
+    let safe_id: String = user_id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect();
+    Some(
+        base.join("com.barramee27.crossusage")
+            .join("cursor-usage-history")
+            .join(format!("{safe_id}.json")),
+    )
+}
+
+fn load_cursor_history_store(user_id: &str) -> HashMap<String, CursorHistoryDay> {
+    let Some(path) = cursor_history_store_path(user_id) else {
+        return HashMap::new();
+    };
+    let Ok(bytes) = std::fs::read(&path) else {
+        return HashMap::new();
+    };
+    let Ok(file) = serde_json::from_slice::<CursorHistoryStoreFile>(&bytes) else {
+        return HashMap::new();
+    };
+    if file.schema_version != HISTORY_STORE_SCHEMA_VERSION || file.user_id != user_id {
+        return HashMap::new();
+    }
+    file.days
+}
+
+fn save_cursor_history_store(user_id: &str, days: &HashMap<String, CursorHistoryDay>) {
+    let Some(path) = cursor_history_store_path(user_id) else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let file = CursorHistoryStoreFile {
+        schema_version: HISTORY_STORE_SCHEMA_VERSION,
+        user_id: user_id.to_string(),
+        days: days.clone(),
+    };
+    if let Ok(bytes) = serde_json::to_vec(&file) {
+        let _ = std::fs::write(&path, bytes);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ParsedUsageEvent {
+    pub timestamp_ms: i64,
+    pub model: String,
+    pub input_no_cache: u64,
+    pub input_cache_write: u64,
+    pub cache_read: u64,
+    pub output_tokens: u64,
+}
+
+pub(crate) struct ParsedUsageEventsPage {
+    pub events: Vec<ParsedUsageEvent>,
+    pub total_count: usize,
+    pub rejected_count: usize,
+}
+
+fn parse_non_neg_u64(v: Option<&Value>) -> Option<u64> {
+    match v {
+        None | Some(Value::Null) => Some(0),
+        Some(Value::Number(n)) => n.as_u64(),
+        _ => None,
+    }
+}
+
+fn parse_timestamp_ms(v: Option<&Value>) -> Option<i64> {
+    match v {
+        Some(Value::String(s)) => s.trim().parse::<i64>().ok().filter(|&ms| ms >= 0),
+        Some(Value::Number(n)) => n.as_i64().filter(|&ms| ms >= 0),
+        _ => None,
+    }
+}
+
+pub(crate) fn parse_usage_events_page(body: &[u8]) -> Result<ParsedUsageEventsPage> {
+    let v: Value = serde_json::from_slice(body).context("invalid usage events JSON")?;
+    let obj = v.as_object().context("usage events root not object")?;
+    let total_count = obj
+        .get("totalUsageEventsCount")
+        .and_then(|n| n.as_u64())
+        .context("missing totalUsageEventsCount")? as usize;
+    let raw_events = obj
+        .get("usageEventsDisplay")
+        .and_then(|a| a.as_array())
+        .context("missing usageEventsDisplay")?;
+
+    let mut events = Vec::with_capacity(raw_events.len());
+    let mut rejected_count = 0usize;
+    for raw in raw_events {
+        let Some(ev) = raw.as_object() else {
+            rejected_count += 1;
+            continue;
+        };
+        let Some(timestamp_ms) = parse_timestamp_ms(ev.get("timestamp")) else {
+            rejected_count += 1;
+            continue;
+        };
+        let Some(model) = ev.get("model").and_then(|m| m.as_str()).map(str::trim) else {
+            rejected_count += 1;
+            continue;
+        };
+        let (input_no_cache, input_cache_write, cache_read, output_tokens) = match ev.get("tokenUsage") {
+            None | Some(Value::Null) => (0, 0, 0, 0),
+            Some(Value::Object(tu)) => {
+                let (Some(inp), Some(out), Some(cw), Some(cr)) = (
+                    parse_non_neg_u64(tu.get("inputTokens")),
+                    parse_non_neg_u64(tu.get("outputTokens")),
+                    parse_non_neg_u64(tu.get("cacheWriteTokens")),
+                    parse_non_neg_u64(tu.get("cacheReadTokens")),
+                ) else {
+                    rejected_count += 1;
+                    continue;
+                };
+                (inp, cw, cr, out)
+            }
+            _ => {
+                rejected_count += 1;
+                continue;
+            }
+        };
+        events.push(ParsedUsageEvent {
+            timestamp_ms,
+            model: model.to_string(),
+            input_no_cache,
+            input_cache_write,
+            cache_read,
+            output_tokens,
+        });
+    }
+    Ok(ParsedUsageEventsPage {
+        events,
+        total_count,
+        rejected_count,
+    })
+}
+
+fn fetch_usage_events_day(
+    client: &reqwest::blocking::Client,
+    cookie: &str,
+    day_key: &str,
+    start_ms: i64,
+    end_ms: i64,
+    is_complete: bool,
+) -> Result<CursorHistoryDay> {
+    let mut page = 1usize;
+    let mut expected_total: Option<usize> = None;
+    let mut received_count = 0usize;
+    let mut day = CursorHistoryDay {
+        models: HashMap::new(),
+        is_complete,
+    };
+
+    loop {
+        let resp = client
+            .post(USAGE_EVENTS_URL)
+            .header("Cookie", cookie)
+            .header("Content-Type", "application/json")
+            .header("Origin", "https://cursor.com")
+            .json(&json!({
+                "startDate": start_ms.to_string(),
+                "endDate": end_ms.to_string(),
+                "page": page,
+                "pageSize": USAGE_EVENTS_PAGE_SIZE,
+            }))
+            .send()?;
+
+        if !resp.status().is_success() {
+            bail!("usage events HTTP {}", resp.status());
+        }
+        let bytes = resp.bytes()?;
+        let parsed = parse_usage_events_page(&bytes)?;
+        if let Some(exp) = expected_total {
+            if parsed.total_count != exp {
+                bail!("incomplete pages: totalCount changed mid-day");
+            }
+        }
+        expected_total = Some(parsed.total_count);
+        let page_count = parsed.events.len() + parsed.rejected_count;
+        received_count += page_count;
+
+        if parsed.total_count == 0 {
+            if page_count == 0 {
+                return Ok(day);
+            }
+            bail!("incomplete pages: non-empty page when totalCount == 0");
+        }
+        if page_count == 0 && received_count < parsed.total_count {
+            bail!("incomplete pages: empty page before totalCount");
+        }
+        for ev in parsed.events {
+            let Some(dt) = DateTime::<Utc>::from_timestamp_millis(ev.timestamp_ms) else {
+                bail!("invalid event timestamp");
+            };
+            let local = dt.with_timezone(&Local);
+            let ev_day = format!("{:04}-{:02}-{:02}", local.year(), local.month(), local.day());
+            if ev_day != day_key {
+                bail!("event outside requested day window");
+            }
+            if ev.model.is_empty() {
+                continue;
+            }
+            day.add(
+                ev.model,
+                CursorHistoryTokens {
+                    input: ev.input_no_cache,
+                    cache_write: ev.input_cache_write,
+                    cache_read: ev.cache_read,
+                    output: ev.output_tokens,
+                },
+            );
+        }
+        if received_count == parsed.total_count {
+            return Ok(day);
+        }
+        if received_count > parsed.total_count {
+            bail!("incomplete pages: received > totalCount");
+        }
+        page += 1;
+    }
+}
+
+fn cursor_history_day_ready_to_publish(
+    date: NaiveDate,
+    today: NaiveDate,
+    day: Option<&CursorHistoryDay>,
+) -> bool {
+    day.is_some_and(|d| date >= today || d.is_complete)
+}
+
+fn fetch_cursor_usage_rows_via_events(
+    plugin_id: &str,
+    since: &str,
+    until: &str,
+) -> Result<Vec<CsvUsageRow>> {
+    let db_path = resolve_state_db_for_plugin(plugin_id).with_context(|| {
+        format!("Cursor state.vscdb not found for {plugin_id}")
+    })?;
+    let access = resolve_cursor_access_token(&db_path)?;
+    let payload = decode_jwt_payload(&access).context("invalid JWT access token")?;
+    let sub = payload.sub.as_deref().context("JWT missing sub")?;
+    let user_id = user_id_from_sub(sub);
+    let cookie = build_session_cookie(&access)?;
+
+    let y1: i32 = since[0..4].parse()?;
+    let m1: u32 = since[4..6].parse()?;
+    let d1: u32 = since[6..8].parse()?;
+    let y2: i32 = until[0..4].parse()?;
+    let m2: u32 = until[4..6].parse()?;
+    let d2: u32 = until[6..8].parse()?;
+    let start_date = NaiveDate::from_ymd_opt(y1, m1, d1).context("invalid since date")?;
+    let end_date = NaiveDate::from_ymd_opt(y2, m2, d2).context("invalid until date")?;
+
+    let now_local = Local::now();
+    let today_date = now_local.date_naive();
+    let yesterday_date = today_date - chrono::Duration::days(1);
+
+    let mut cached = load_cursor_history_store(&user_id);
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()?;
+
+    let mut dates = Vec::new();
+    let mut cur = end_date;
+    while cur >= start_date {
+        dates.push(cur);
+        let Some(prev) = cur.pred_opt() else { break };
+        cur = prev;
+    }
+
+    let deadline = Instant::now() + SPEND_HISTORY_BUDGET;
+    let mut updated = false;
+
+    for date in &dates {
+        let day_key = date.format("%Y-%m-%d").to_string();
+        let force_refresh = *date >= yesterday_date;
+        let needs_fetch = force_refresh
+            || cached
+                .get(&day_key)
+                .map(|d| !d.is_complete)
+                .unwrap_or(true);
+        if !needs_fetch {
+            continue;
+        }
+        if Instant::now() >= deadline {
+            break;
+        }
+        let day_start = Local
+            .from_local_datetime(&date.and_hms_opt(0, 0, 0).unwrap())
+            .single()
+            .or_else(|| Local.from_local_datetime(&date.and_hms_opt(0, 0, 0).unwrap()).earliest())
+            .context("invalid local start")?;
+        let next_date = date.succ_opt().unwrap_or(*date);
+        let next_start = Local
+            .from_local_datetime(&next_date.and_hms_opt(0, 0, 0).unwrap())
+            .single()
+            .or_else(|| Local.from_local_datetime(&next_date.and_hms_opt(0, 0, 0).unwrap()).earliest())
+            .context("invalid local next start")?;
+        let start_ms = day_start.timestamp_millis();
+        let next_ms = next_start.timestamp_millis();
+        let now_ms = now_local.timestamp_millis();
+        let is_complete = next_ms <= now_ms;
+        let end_ms = next_ms.min(now_ms) - 1;
+        if end_ms < start_ms {
+            cached.insert(
+                day_key,
+                CursorHistoryDay {
+                    models: HashMap::new(),
+                    is_complete: false,
+                },
+            );
+            continue;
+        }
+        if let Ok(day_data) =
+            fetch_usage_events_day(&client, &cookie, &day_key, start_ms, end_ms, is_complete)
+        {
+            cached.insert(day_key, day_data);
+            updated = true;
+        }
+    }
+
+    if updated {
+        save_cursor_history_store(&user_id, &cached);
+    }
+
+    // Upstream #1373: only publish once every requested day is present.
+    // Past days must be complete so a failed yesterday refetch falls back to CSV
+    // instead of keeping the in-progress snapshot from when that day was still today.
+    for date in &dates {
+        let day_key = date.format("%Y-%m-%d").to_string();
+        if !cursor_history_day_ready_to_publish(*date, today_date, cached.get(&day_key)) {
+            bail!("usage history backfill incomplete for window {since}-{until}");
+        }
+    }
+
+    let pricing = default_pricing();
+    let mut rows = Vec::new();
+    for date in dates.into_iter().rev() {
+        let day_key = date.format("%Y-%m-%d").to_string();
+        let Some(day) = cached.get(&day_key) else {
+            continue;
+        };
+        for (model, tok) in &day.models {
+            let sum_tokens = tok.input + tok.cache_write + tok.cache_read + tok.output;
+            if sum_tokens == 0 {
+                continue;
+            }
+            let tb = TokenBreakdown {
+                input: tok.input.min(i32::MAX as u64) as i32,
+                cache_write5m: tok.cache_write.min(i32::MAX as u64) as i32,
+                cache_write1h: 0,
+                cache_read: tok.cache_read.min(i32::MAX as u64) as i32,
+                output: tok.output.min(i32::MAX as u64) as i32,
+                is_fast: false,
+            };
+            let cost_usd = pricing
+                .resolve(model)
+                .map(|r| r.cost_dollars_with_options(&tb, false))
+                .unwrap_or(0.0);
+            rows.push(CsvUsageRow {
+                day_key: day_key.clone(),
+                model: model.clone(),
+                input_cache_write: tok.cache_write,
+                input_no_cache: tok.input,
+                cache_read: tok.cache_read,
+                output_tokens: tok.output,
+                total_tokens: sum_tokens,
+                cost_usd,
+            });
+        }
+    }
+    Ok(rows)
+}
+
+fn load_cursor_usage_rows_with_events_fallback(
+    plugin_id: &str,
+    since: &str,
+    until: &str,
+    preloaded_csv: Option<String>,
+) -> Result<Vec<CsvUsageRow>> {
+    if let Ok(rows) = fetch_cursor_usage_rows_via_events(plugin_id, since, until) {
+        return Ok(rows);
+    }
+    let csv_text = match preloaded_csv {
+        Some(t) => t,
+        None => fetch_csv_cached(plugin_id, since, until)?,
+    };
+    parse_usage_csv(&csv_text, since, until)
+}
+
 fn row_agg_to_json(key: String, a: &RowAgg) -> UsageStatsRowJson {
     UsageStatsRowJson {
         key,
@@ -741,8 +1177,7 @@ pub fn query_usage_stats(
         bail!("group must be 'model' or 'provider'");
     }
 
-    let csv_text = fetch_csv_cached(plugin_id, &since, &until)?;
-    let rows = parse_usage_csv(&csv_text, &since, &until)?;
+    let rows = load_cursor_usage_rows_with_events_fallback(plugin_id, &since, &until, None)?;
     let map = if group == "model" {
         aggregate_by_model(&rows)
     } else {
@@ -830,5 +1265,80 @@ mod tests {
         let stats = sorted_stats_rows(&by_model);
         assert_eq!(stats[0].key, "pricey");
         assert!(stats[0].cost_usd > stats[1].cost_usd);
+    }
+
+    #[test]
+    fn parses_usage_events_page_and_counts_rejected_rows() {
+        let payload = serde_json::json!({
+            "totalUsageEventsCount": 3,
+            "usageEventsDisplay": [
+                {
+                    "timestamp": "1774947200000",
+                    "model": "claude-opus-4-8",
+                    "tokenUsage": {
+                        "inputTokens": 1000,
+                        "outputTokens": 200,
+                        "cacheWriteTokens": 500,
+                        "cacheReadTokens": 300
+                    }
+                },
+                {
+                    "timestamp": 1774947205000i64,
+                    "model": "default",
+                    "tokenUsage": null
+                },
+                {
+                    "timestamp": "bad",
+                    "model": "claude-opus-4-8"
+                }
+            ]
+        });
+        let page = parse_usage_events_page(&serde_json::to_vec(&payload).unwrap()).unwrap();
+        assert_eq!(page.total_count, 3);
+        assert_eq!(page.events.len(), 2);
+        assert_eq!(page.rejected_count, 1);
+        assert_eq!(page.events[0].model, "claude-opus-4-8");
+        assert_eq!(page.events[0].input_no_cache, 1000);
+        assert_eq!(page.events[0].input_cache_write, 500);
+        assert_eq!(page.events[0].cache_read, 300);
+        assert_eq!(page.events[0].output_tokens, 200);
+        assert_eq!(page.events[1].model, "default");
+        assert_eq!(page.events[1].input_no_cache, 0);
+    }
+
+    #[test]
+    fn incomplete_yesterday_is_not_ready_to_publish() {
+        let today = NaiveDate::from_ymd_opt(2026, 10, 19).unwrap();
+        let yesterday = today - chrono::Duration::days(1);
+        let older = today - chrono::Duration::days(2);
+        let incomplete = CursorHistoryDay {
+            models: HashMap::new(),
+            is_complete: false,
+        };
+        let complete = CursorHistoryDay {
+            models: HashMap::new(),
+            is_complete: true,
+        };
+        assert!(!cursor_history_day_ready_to_publish(
+            yesterday,
+            today,
+            Some(&incomplete)
+        ));
+        assert!(cursor_history_day_ready_to_publish(
+            yesterday,
+            today,
+            Some(&complete)
+        ));
+        assert!(!cursor_history_day_ready_to_publish(
+            older,
+            today,
+            Some(&incomplete)
+        ));
+        assert!(cursor_history_day_ready_to_publish(
+            today,
+            today,
+            Some(&incomplete)
+        ));
+        assert!(!cursor_history_day_ready_to_publish(yesterday, today, None));
     }
 }
