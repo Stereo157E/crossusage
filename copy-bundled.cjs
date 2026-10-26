@@ -22,9 +22,14 @@ function buildCursorNightlyPlugin() {
 
 buildCursorNightlyPlugin()
 
+function isBundledFile(src) {
+  return !src.endsWith(".test.js") && !src.endsWith("test-helpers.js") && !src.endsWith(".md")
+}
+
 function directoriesMatch(source, destination) {
   if (!existsSync(destination)) return false
   const entries = readdirSync(source, { withFileTypes: true })
+    .filter((entry) => isBundledFile(join(source, entry.name)))
   const targets = readdirSync(destination, { withFileTypes: true })
   if (entries.length !== targets.length) return false
   return entries.every((entry) => {
@@ -47,7 +52,10 @@ if (bundled.length === plugins.length && plugins.every((id) => directoriesMatch(
 rmSync(dstDir, { recursive: true, force: true })
 
 for (const id of plugins) {
-  cpSync(join(srcDir, id), join(dstDir, id), { recursive: true })
+  cpSync(join(srcDir, id), join(dstDir, id), {
+    recursive: true,
+    filter: isBundledFile,
+  })
 }
 
 console.log(`Bundled ${plugins.length} plugins: ${plugins.join(", ")}`)

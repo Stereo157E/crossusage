@@ -112,3 +112,4 @@ Use below list to store and recall user notes when asked to do so.
 - **No file line-count budget.** Do not split, truncate, or drop code because a file is “too long.” Keep a feature in one place if that is clearer.
 
 - **Publication privacy:** Never commit personal filesystem paths/usernames, unrelated private project names, user conversation notes, raw diagnostic logs, account identifiers, credentials, or machine-specific session details. Keep public documentation generic and technical. Before every commit/push, inspect staged content AND all newly published commits, including author/committer metadata. Files already tracked remain tracked despite .gitignore. Store any necessary private working notes outside the repository; never copy their contents into public breadcrumbs.
+- **Public docs:** Keep choices and breadcrumbs limited to product and engineering notes.

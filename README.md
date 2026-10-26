@@ -12,7 +12,9 @@ Menu-bar app for AI coding subscription usage — one panel, progress bars, no d
 
 **Versioning:** CrossUsage uses **`MAJOR.MINOR.PATCH`** (e.g. `1.0.10`). See [docs/VERSIONING.md](docs/VERSIONING.md) for when to bump each part. Upstream OpenUsage `0.6.x` is tracked in the changelog only, not in our app version.
 
-![CrossUsage screenshot](screenshot.png)
+This fork incorporates CrossUsage **1.6.1**, including OpenUsage **0.7.14–0.7.15** provider updates. Ollama supports monthly dollar allowances and purchased credits; Cursor supports incremental usage history and team model pools. The native Linux tray and disabled binary updater remain fork-specific.
+
+![CrossUsage on Linux — Modern Dashboard, Classic Overview, and Provider Detail](screenshot.png)
 
 ## Download
 

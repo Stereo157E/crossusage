@@ -12,6 +12,9 @@ test("bundling preserves unchanged timestamps and replaces stale generated resou
   for (const id of ["cursor", "cursor-nightly", "mock"]) {
     fs.mkdirSync(path.join(root, "plugins", id), { recursive: true });
     fs.writeFileSync(path.join(root, "plugins", id, "plugin.js"), "original");
+    fs.writeFileSync(path.join(root, "plugins", id, "plugin.test.js"), "test only");
+    fs.writeFileSync(path.join(root, "plugins", id, "README.md"), "documentation only");
+    fs.writeFileSync(path.join(root, "plugins", id, "test-helpers.js"), "test helper only");
   }
   const run = () => execFileSync(process.execPath, ["copy-bundled.cjs"], { cwd: root });
   run();
@@ -24,6 +27,9 @@ test("bundling preserves unchanged timestamps and replaces stale generated resou
   assert.equal(fs.statSync(nightly).mtimeMs, 100000);
   assert.equal(fs.statSync(copied).mtimeMs, 100000);
   assert.equal(fs.existsSync(path.join(bundled, "mock")), false);
+  for (const name of ["plugin.test.js", "README.md", "test-helpers.js"]) {
+    assert.equal(fs.existsSync(path.join(bundled, "cursor", name)), false);
+  }
 
   fs.writeFileSync(path.join(root, "plugins/cursor/plugin.js"), "updated");
   fs.mkdirSync(path.join(bundled, "obsolete"));

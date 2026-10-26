@@ -1,5 +1,19 @@
 # Breadcrumbs
 
+## 2026-10-19
+
+- Resolved Grok Bot QA notes and CI checks on PR #40: added `crates/crossusage-cli/build.rs` so `embedded_plugins.rs` stages filtered runtime plugins into `$OUT_DIR/bundled_plugins` without requiring `copy-bundled.cjs` first; auto-created the dev CLI sidecar stub in `scripts/tauri-before-dev.cjs` for clean checkouts; localized the Modern top navigation tabs (`dashboard`, `customize`, `polls`, `settings`) in `modern-shell.tsx` across all 13 locales; fixed `cursorPaths.resolveStateDb` zero-argument arity in `host_api.rs`; and silenced Windows dead-code warnings in `chromium_cookies.rs`.
+- Ported OpenUsage **v0.7.15** onto `perf/optimize-build-and-size` and bumped CrossUsage to **1.6.1** (PATCH): Codex dashboard link (`chatgpt.com/settings/usage`), Gemini `-n` effort pricing alias, Codex `codex-auto-review` $0 cost since Oct 6 2026, OpenCode Go `20260805200742_import_legacy_credentials` migration check, Ollama `/api/balance` dollar allowance + `Purchased Credits`, Claude `Rate Limit Resets` hourly throttling, and Cursor paged `get-filtered-usage-events` incremental day-by-day history cache (`docs/PORT-0.7.15.md`).
+- Replaced legacy macOS `screenshot.png` (1.06 MB) with a native Linux CrossUsage 1.6.1 showcase composite (194 KB) displaying the Modern UI Dashboard, Classic UI Overview, and Classic UI Provider Detail views (`#39`).
+
+## 2026-10-16
+
+- Ported OpenUsage **v0.7.14** onto `perf/optimize-build-and-size`: Codex plan names (`Pro 100`, `Pro 200`, `Pro 500`), Cursor team model pool preference over legacy $20 allowance, OpenCode Go sub-1% Session reset countdowns + 5h placeholder reset drop, and `docs/PORT-0.7.14.md`.
+
+## 2026-10-14
+
+- Build/size optimization pass: added `[profile.release]` (`strip = "symbols"`, `lto = "thin"`, `codegen-units = 1`) and `[profile.dev]` (`debug = 1`); set `src-tauri` `crate-type = ["rlib"]`; skipped `--target` in `prepare-cli-sidecar.sh` when native; replaced `tauri-plugin-aptabase` with direct `reqwest::blocking` POST; gated `tauri-plugin-liquid-glass` to macOS; dropped `rquickjs` `bindgen`, `time`, `users`, `color-eyre`, `textwrap`, `owo-colors`, and unused CLI deps; stripped `*.test.js`/`*.md` from bundled plugins and 6.4 MB of unused icons; code-split frontend views/locales and dropped `@base-ui/react`.
+
 ## 2026-10-05
 
 - Ship number on `feat/port-openusage-0.7.13` is **1.6.0** (MINOR). The base account label sets the bump; the v0.7.13 port rides along.
@@ -97,3 +111,7 @@
 - Unix environment-discovery shells start in separate sessions, preventing controlling-terminal access from suspending the application job. `just run` remains in the foreground and supports Ctrl+C.
 - Validation: production frontend/native release builds, 91 frontend tests, six native tray tests and ten environment-related core tests passed. Linux desktop checks verified registration, icon export, primary/middle-click actions, menu export, clean quit, distinct provider/bars icons, dynamic tooltips and terminal Ctrl+C cleanup. Windows/macOS runtime checks remain outstanding.
 - Known baseline test issue: two support-bundle redaction tests loop indefinitely; excluded from the broader app test run after reproducing the hang. Their code remains unchanged.
+
+- Integrated CrossUsage v1.6.1 with OpenUsage v0.7.14–v0.7.15 provider updates and build optimizations. Preserved native Linux integration, disabled updates, hidden-polls navigation, credential precedence, and incremental sidecar preparation. Upstream fixes gate Windows decoders and test helpers, remove the unused Cursor path helper, and restore shutdown cache flushing.
+- Audited changed provider request/response fields against the shared core host redaction lists: existing credential, profile, account, and reset-credit identifier coverage remains applicable; new usage fields contain amounts, percentages, periods, and plan labels.
+- Validation: frontend production build, 1,577 frontend tests, five build-script tests, five CLI tests, 182 core tests, and 56 desktop tests passed. The two documented environment-dependent ccusage subprocess tests still fail, including outside the sandbox. Desktop/core/CLI compile checks no longer report the seven unused-code warnings. The upstream support-bundle redaction fix also resolves the previously recorded test hangs.

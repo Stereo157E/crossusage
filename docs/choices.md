@@ -1,5 +1,14 @@
 # Choices
 
+## 2026-10-19
+
+- **1.6.1 (PATCH):** OpenUsage **v0.7.14 + v0.7.15** ports + build/size optimization pass ([VERSIONING.md](./VERSIONING.md)).
+- **OpenUsage v0.7.15 port:** Ported Codex dashboard link (`chatgpt.com/settings/usage`), Gemini `-n` none-effort pricing alias (`compile_alias_pattern` lookahead handling in `regex-lite`), Codex `codex-auto-review` $0 cost since `2026-10-06T00:00:00Z` across Codex + Pi scanners, OpenCode Go `__drizzle_migrations` check (`20260805200742_import_legacy_credentials`), Ollama `/api/balance` dollar allowance + `Purchased Credits`, Claude `Rate Limit Resets` hourly polling cache (`3600000ms`), and Cursor incremental day-by-day paged `get-filtered-usage-events` history cache (`cursor-usage-history/*.json`) with CSV fallback.
+
+## 2026-10-16
+
+- **OpenUsage v0.7.14 port:** Ported Codex plan names (`Pro 100`/`Pro 200`/`Pro 500`), Cursor structured team usage pools (`hasModelPools`), and OpenCode Go sub-1% session reset countdowns (dropping 5h placeholder resets and setting `sessionStartSignal: "missingResetDate"`). Skipped macOS `xswap`/SwiftUI-only changes (#1322, #1338, #1343, #1345, #1346, #1349). Hold release until OpenUsage v0.7.15 stable ships.
+
 ## 2026-10-05
 
 - **1.6.0:** MINOR. The base account label is a CrossUsage feature ([VERSIONING.md](./VERSIONING.md)). OpenUsage **v0.7.13** rides along (would be PATCH alone).
@@ -111,3 +120,6 @@
 - Release launch: keep `just run` in the foreground so Ctrl+C stops the app. On Unix, detach only interactive environment-discovery shells with `setsid` before exec; null stdin alone does not prevent those shells from opening the controlling terminal.
 - Linux tray: integrate KSNI directly rather than patching Tauri or substituting the incompatible AppIndicator GLib library. Enable Tauri's tray and positioner tray features only on Windows/macOS. Keep menu actions shared, dispatch Linux callbacks to the main thread, preserve usage summaries and log-level controls, and use native primary/middle/right-click behavior.
 - Tray rendering: route the existing frontend renderer through a platform adapter. Linux passes Tauri image resource IDs to KSNI via application commands and restores its embedded default icon when no providers are enabled; Windows/macOS retain Tauri's tray API.
+
+- Upstream 1.6.1 integration: retain the native Linux tray, platform-specific tray dependencies, disabled binary updater, file-first Claude credentials, and real incremental debug sidecar. Flush the local HTTP cache on programmatic exit and final shutdown before stopping KSNI.
+- Plugin packaging: apply the same runtime-file filter when copying and comparing bundled plugins, preserving unchanged timestamps while excluding tests, test helpers, and Markdown.

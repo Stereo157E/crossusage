@@ -690,11 +690,26 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     const hasPlanUsageLimit = hasPlanUsage && Number.isFinite(limitN)
     const planUsageLimitMissing = hasPlanUsage && !hasPlanUsageLimit
     const hasTotalUsagePercent = hasPlanUsage && Number.isFinite(pctN)
+    const autoN = hasPlanUsage ? readFiniteNumber(pu.autoPercentUsed) : NaN
+    const apiN = hasPlanUsage ? readFiniteNumber(pu.apiPercentUsed) : NaN
+    const totalSpendN = hasPlanUsage ? readFiniteNumber(pu.totalSpend) : NaN
+    const remainingN = hasPlanUsage ? readFiniteNumber(pu.remaining) : NaN
+    const defaultLimit = Number.isFinite(limitN) ? limitN : 0
+    const spent = Number.isFinite(totalSpendN)
+      ? totalSpendN
+      : (defaultLimit - (Number.isFinite(remainingN) ? remainingN : defaultLimit))
+    const hasModelPools =
+      Number.isFinite(autoN) &&
+      Number.isFinite(apiN) &&
+      autoN >= 0 &&
+      apiN >= 0 &&
+      (autoN > 0 || apiN > 0 || spent === 0)
     return {
       hasPlanUsage: hasPlanUsage,
       hasPlanUsageLimit: hasPlanUsageLimit,
       planUsageLimitMissing: planUsageLimitMissing,
       hasTotalUsagePercent: hasTotalUsagePercent,
+      hasModelPools: hasModelPools,
       pu: pu,
     }
   }
@@ -715,15 +730,16 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     }
 
     const normalizedPlanName = typeof planName === "string"
-      ? planName.toLowerCase()
+      ? planName.trim().toLowerCase()
       : ""
 
     const flags = getConnectUsageMetricFlags(usage)
     const hasPlanUsageLimit = flags.hasPlanUsageLimit
     const hasTotalUsagePercent = flags.hasTotalUsagePercent
+    const hasModelPools = flags.hasModelPools
     const pu = flags.pu
 
-    if (!hasPlanUsageLimit && !hasTotalUsagePercent) {
+    if (!hasPlanUsageLimit && !hasTotalUsagePercent && !hasModelPools) {
       throw "Total usage limit missing from API response."
     }
 
@@ -781,7 +797,20 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
       (su && typeof su.pooledLimit === "number" && su.pooledLimit > 0)
     )
 
-    if (isTeamAccount) {
+    if (isTeamAccount && hasModelPools) {
+      // Modern Teams seats still report the old $20 allowance. Structured pool data wins;
+      // never synthesize a total from stale dollars when Cursor omits totalPercentUsed.
+      if (hasTotalUsagePercent) {
+        lines.push(ctx.line.progress({
+          label: "Total usage",
+          used: pu.totalPercentUsed,
+          limit: 100,
+          format: { kind: "percent" },
+          resetsAt: ctx.util.toIso(usage.billingCycleEnd),
+          periodDurationMs: billingPeriodMs,
+        }))
+      }
+    } else if (isTeamAccount) {
       if (!hasPlanUsageLimit) {
         return null
       }
@@ -1682,21 +1711,20 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     }
 
     const normalizedPlanName = typeof planName === "string"
-      ? planName.toLowerCase()
+      ? planName.trim().toLowerCase()
       : ""
 
-    const hasPlanUsage = !!usage.planUsage
-    const hasPlanUsageLimit = hasPlanUsage &&
-      typeof usage.planUsage.limit === "number" &&
-      Number.isFinite(usage.planUsage.limit)
-    const planUsageLimitMissing = hasPlanUsage && !hasPlanUsageLimit
-    const hasTotalUsagePercent = hasPlanUsage &&
-      typeof usage.planUsage.totalPercentUsed === "number" &&
-      Number.isFinite(usage.planUsage.totalPercentUsed)
+    const probeFlags = getConnectUsageMetricFlags(usage)
+    const hasPlanUsage = probeFlags.hasPlanUsage
+    const hasPlanUsageLimit = probeFlags.hasPlanUsageLimit
+    const planUsageLimitMissing = probeFlags.planUsageLimitMissing
+    const hasTotalUsagePercent = probeFlags.hasTotalUsagePercent
+    const hasModelPools = probeFlags.hasModelPools
+    const planUsageUnusable = !hasPlanUsage || (planUsageLimitMissing && !hasModelPools)
 
     // Enterprise and some Team request-based accounts can return no planUsage
     // or a planUsage object without limit from the Connect API.
-    const needsRequestBasedFallback = usage.enabled !== false && (!hasPlanUsage || planUsageLimitMissing) && (
+    const needsRequestBasedFallback = usage.enabled !== false && planUsageUnusable && (
       normalizedPlanName === "enterprise" ||
       normalizedPlanName === "team"
     )
@@ -1710,7 +1738,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
     }
 
     const needsFallbackWithoutPlanInfo = usage.enabled !== false &&
-      (!hasPlanUsage || planUsageLimitMissing) &&
+      planUsageUnusable &&
       !hasTotalUsagePercent &&
       !normalizedPlanName &&
       planInfoUnavailable
@@ -1719,7 +1747,7 @@ globalThis.__OPENUSAGE_PLUGIN_REGISTRATION_ID__ = "cursor-nightly";
       return buildUnknownRequestBasedResult(ctx, accessToken, planName)
     }
 
-    if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent) {
+    if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent && !hasModelPools) {
       ctx.host.log.warn("planUsage.limit missing, attempting REST usage API fallback")
       try {
         return buildUnknownRequestBasedResult(ctx, accessToken, planName)

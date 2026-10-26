@@ -2500,4 +2500,140 @@ describe("cursor plugin", () => {
       expect.stringContaining("usage export MTD attach failed")
     )
   })
+
+  it("prefers structured team model pools over legacy $20 allowance (#1337)", async () => {
+    const ctx = makeCtx()
+    ctx.host.sqlite.query.mockReturnValue(JSON.stringify([{ value: "token" }]))
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("GetCurrentPeriodUsage")) {
+        return {
+          status: 200,
+          bodyText: JSON.stringify({
+            enabled: true,
+            billingCycleStart: 1770000000000,
+            billingCycleEnd: 1772592000000,
+            planUsage: {
+              totalSpend: 1022,
+              includedSpend: 1022,
+              remaining: 978,
+              limit: 2000,
+              autoPercentUsed: 2.6476190476190475,
+              apiPercentUsed: 11.65,
+              totalPercentUsed: 4.088,
+            },
+            spendLimitUsage: { limitType: "team", pooledUsed: 0 },
+          }),
+        }
+      }
+      if (String(opts.url).includes("GetPlanInfo")) {
+        return { status: 200, bodyText: JSON.stringify({ planInfo: { planName: "Team" } }) }
+      }
+      return { status: 200, bodyText: "{}" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    const total = result.lines.find((l) => l.label === "Total usage")
+    expect(total).toBeTruthy()
+    expect(total.format).toEqual({ kind: "percent" })
+    expect(total.used).toBeCloseTo(4.088, 5)
+    expect(result.lines.find((l) => l.label === "Cursor Models")?.used).toBeCloseTo(2.647619, 5)
+    expect(result.lines.find((l) => l.label === "Other Models")?.used).toBeCloseTo(11.65, 5)
+  })
+
+  it("omits Total usage on team premium seat with model pools when totalPercentUsed is absent", async () => {
+    const ctx = makeCtx()
+    ctx.host.sqlite.query.mockReturnValue(JSON.stringify([{ value: "token" }]))
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("GetCurrentPeriodUsage")) {
+        return {
+          status: 200,
+          bodyText: JSON.stringify({
+            enabled: true,
+            planUsage: {
+              limit: 2000,
+              totalSpend: 666,
+              autoPercentUsed: 0.3728571428571429,
+              apiPercentUsed: 2.025,
+            },
+            spendLimitUsage: { limitType: "team", pooledUsed: 0 },
+          }),
+        }
+      }
+      if (String(opts.url).includes("GetPlanInfo")) {
+        return { status: 200, bodyText: JSON.stringify({ planInfo: { planName: "Team" } }) }
+      }
+      return { status: 200, bodyText: "{}" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    expect(result.lines.find((l) => l.label === "Total usage")).toBeUndefined()
+    expect(result.lines.find((l) => l.label === "Cursor Models")?.used).toBeCloseTo(0.372857, 5)
+    expect(result.lines.find((l) => l.label === "Other Models")?.used).toBeCloseTo(2.025, 5)
+  })
+
+  it("does not trigger request fallback when team model pools exist without limit", async () => {
+    const ctx = makeCtx()
+    ctx.host.sqlite.query.mockReturnValue(JSON.stringify([{ value: "token" }]))
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("GetCurrentPeriodUsage")) {
+        return {
+          status: 200,
+          bodyText: JSON.stringify({
+            enabled: true,
+            planUsage: { autoPercentUsed: 0, apiPercentUsed: 0 },
+            spendLimitUsage: { limitType: "team" },
+          }),
+        }
+      }
+      if (String(opts.url).includes("GetPlanInfo")) {
+        return { status: 200, bodyText: JSON.stringify({ planInfo: { planName: "Team" } }) }
+      }
+      if (String(opts.url).includes("cursor.com/api/usage")) {
+        throw new Error("unexpected REST usage fallback")
+      }
+      return { status: 200, bodyText: "{}" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    expect(result.lines.find((l) => l.label === "Cursor Models")?.used).toBe(0)
+    expect(result.lines.find((l) => l.label === "Other Models")?.used).toBe(0)
+  })
+
+  it("keeps legacy dollar meter for $5000 team pool when model pools are zero placeholders beside positive spend", async () => {
+    const ctx = makeCtx()
+    ctx.host.sqlite.query.mockReturnValue(JSON.stringify([{ value: "token" }]))
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("GetCurrentPeriodUsage")) {
+        return {
+          status: 200,
+          bodyText: JSON.stringify({
+            enabled: true,
+            planUsage: {
+              limit: 500000,
+              totalSpend: 234500,
+              autoPercentUsed: 0,
+              apiPercentUsed: 0,
+              totalPercentUsed: 0,
+            },
+            spendLimitUsage: { limitType: "team", pooledUsed: 0 },
+          }),
+        }
+      }
+      if (String(opts.url).includes("GetPlanInfo")) {
+        return { status: 200, bodyText: JSON.stringify({ planInfo: { planName: "Team" } }) }
+      }
+      return { status: 200, bodyText: "{}" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    const total = result.lines.find((l) => l.label === "Total usage")
+    expect(total).toBeTruthy()
+    expect(total.format).toEqual({ kind: "dollars" })
+    expect(total.used).toBe(2345)
+    expect(total.limit).toBe(5000)
+  })
 })
