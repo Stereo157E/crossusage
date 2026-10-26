@@ -106,6 +106,8 @@
 
 ## 2026-10-26
 
+- Polls navigation visibility follows the existing product polls setting in both layouts.
+
 - Release launch: keep `just run` in the foreground so Ctrl+C stops the app. On Unix, detach only interactive environment-discovery shells with `setsid` before exec; null stdin alone does not prevent those shells from opening the controlling terminal.
 - Linux tray: integrate KSNI directly rather than patching Tauri or substituting the incompatible AppIndicator GLib library. Enable Tauri's tray and positioner tray features only on Windows/macOS. Keep menu actions shared, dispatch Linux callbacks to the main thread, preserve usage summaries and log-level controls, and use native primary/middle/right-click behavior.
 - Tray rendering: route the existing frontend renderer through a platform adapter. Linux passes Tauri image resource IDs to KSNI via application commands and restores its embedded default icon when no providers are enabled; Windows/macOS retain Tauri's tray API.

@@ -1,4 +1,5 @@
 import { useCallback } from "react"
+import { useProductPollsStore } from "@/stores/product-polls-store"
 import { BarChart3, CircleHelp, Settings } from "lucide-react"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { FORK_REPO_URL } from "@/lib/fork-meta"
@@ -143,6 +144,7 @@ export function SideNav({
   pollsBadge = false,
 }: SideNavProps) {
   const isDark = useDarkMode()
+  const pollsEnabled = useProductPollsStore((s) => s.enabled)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -251,14 +253,16 @@ export function SideNav({
       </div>
 
       {/* Polls */}
-      <NavButton
-        isActive={activeView === "polls"}
-        onClick={() => onViewChange("polls")}
-        aria-label={pollsBadge ? "Polls (new)" : "Polls"}
-        badge={pollsBadge}
-      >
-        <BarChart3 className="size-10" />
-      </NavButton>
+      {pollsEnabled && (
+        <NavButton
+          isActive={activeView === "polls"}
+          onClick={() => onViewChange("polls")}
+          aria-label={pollsBadge ? "Polls (new)" : "Polls"}
+          badge={pollsBadge}
+        >
+          <BarChart3 className="size-10" />
+        </NavButton>
+      )}
 
       {/* Help */}
       <NavButton

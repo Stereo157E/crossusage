@@ -78,6 +78,7 @@ export function ModernShell({
   const [screen, setScreen] = useState<ModernScreen>("dashboard")
   const appVersion = useAppVersion()
   const pollsBadge = useProductPollsBadge(appVersion)
+  const pollsEnabled = useProductPollsStore((s) => s.enabled)
   const bumpPollsVisit = useProductPollsStore((s) => s.bumpPollsVisit)
   const pollsVisitNonce = useProductPollsStore((s) => s.pollsVisitNonce)
   useTrayRestartBridge(updateStatus, onUpdateInstall)
@@ -284,7 +285,7 @@ export function ModernShell({
               ["polls", "Polls"],
               ["settings", "Settings"],
             ] as const
-          ).map(([id, label]) => (
+          ).filter(([id]) => id !== "polls" || pollsEnabled).map(([id, label]) => (
             <Button
               key={id}
               type="button"

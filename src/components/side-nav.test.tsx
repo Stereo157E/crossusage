@@ -1,10 +1,11 @@
-import { render, screen } from "@testing-library/react"
+import { act, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { invoke } from "@tauri-apps/api/core"
 
 import { SideNav } from "@/components/side-nav"
+import { useProductPollsStore } from "@/stores/product-polls-store"
 
 const darkModeState = vi.hoisted(() => ({
   useDarkModeMock: vi.fn(() => false),
@@ -99,5 +100,15 @@ describe("SideNav", () => {
 
     expect(openUrl).toHaveBeenCalledWith("https://github.com/barramee27/crossusage/issues")
     expect(invoke).toHaveBeenCalledWith("hide_panel")
+  })
+
+  it("hides Polls when disabled and restores it when enabled", () => {
+    render(<SideNav activeView="home" onViewChange={vi.fn()} plugins={[]} />)
+
+    act(() => useProductPollsStore.getState().setEnabled(false))
+    expect(screen.queryByRole("button", { name: "Polls" })).not.toBeInTheDocument()
+
+    act(() => useProductPollsStore.getState().setEnabled(true))
+    expect(screen.getByRole("button", { name: "Polls" })).toBeInTheDocument()
   })
 })
