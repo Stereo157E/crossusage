@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { resolveResource } from "@tauri-apps/api/path"
-import { TrayIcon } from "@tauri-apps/api/tray"
+import { getTrayHandle, type TrayHandle } from "@/lib/tray-backend"
 import type { PluginMeta } from "@/lib/plugin-types"
 import type { DisplayMode, MenubarIconStyle, PluginSettings } from "@/lib/settings"
 import { getEnabledPluginIds, getProviderInstanceMeta } from "@/lib/settings"
@@ -50,7 +50,7 @@ const EMPTY_TRAY_SETTINGS_PREVIEW: TraySettingsPreview = {
   providerPercentText: "--%",
 }
 
-/** Linux: tray tooltips are unreliable on AppIndicator; Rust mirrors this text in disabled menu rows. */
+/** Linux mirrors usage text in disabled menu rows as well as the native tooltip. */
 function mirrorTrayUsageSummaryToBackend(summary: string) {
   if (!isTauri()) return
   void invoke("update_tray_usage_summary", { summary }).catch(() => {
@@ -101,7 +101,7 @@ export function useTrayIcon({
   activeView,
   uiLayout,
 }: UseTrayIconArgs) {
-  const trayRef = useRef<TrayIcon | null>(null)
+  const trayRef = useRef<TrayHandle | null>(null)
   const trayGaugeIconPathRef = useRef<string | null>(null)
   const trayUpdateTimerRef = useRef<number | null>(null)
   const trayUpdatePendingRef = useRef(false)
@@ -211,7 +211,7 @@ export function useTrayIcon({
       const rasterUsesTemplate = false
 
       const maybeSetTitle =
-        (tray as TrayIcon & { setTitle?: (value: string | null) => Promise<void> }).setTitle
+        tray.setTitle
       const setTitleFn =
         typeof maybeSetTitle === "function"
           ? (value: string | null) => maybeSetTitle.call(tray, value)
@@ -223,9 +223,7 @@ export function useTrayIcon({
         return Promise.resolve()
       }
 
-      const maybeSetTooltip = (
-        tray as TrayIcon & { setTooltip?: (value: string | null) => Promise<void> }
-      ).setTooltip
+      const maybeSetTooltip = tray.setTooltip
       const setTooltipFn =
         typeof maybeSetTooltip === "function"
           ? (value: string | null) => maybeSetTooltip.call(tray, value)
@@ -240,9 +238,10 @@ export function useTrayIcon({
       const restoreGaugeIcon = () => {
         mirrorTrayUsageSummaryToBackend("CrossUsage")
         const gaugePath = trayGaugeIconPathRef.current
-        if (gaugePath) {
+        const restoreIcon = tray.resetIcon ?? (gaugePath ? () => tray.setIcon(gaugePath) : null)
+        if (restoreIcon) {
           Promise.all([
-            tray.setIcon(gaugePath),
+            restoreIcon(),
             tray.setIconAsTemplate(true),
             setTrayTitle(""),
             setTrayTooltip("CrossUsage"),
@@ -541,7 +540,7 @@ export function useTrayIcon({
 
       ; (async () => {
         try {
-          const tray = await TrayIcon.getById("tray")
+          const tray = await getTrayHandle()
           if (cancelled) return
           trayRef.current = tray
           trayInitializedRef.current = true

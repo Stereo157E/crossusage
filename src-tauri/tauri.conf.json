@@ -44,7 +44,6 @@
       "deb": {
         "depends": [
           "libwebkit2gtk-4.1-0",
-          "libayatana-appindicator3-1 | libappindicator3-1",
           "libgtk-3-0",
           "xdg-desktop-portal",
           "xdg-desktop-portal-gtk | xdg-desktop-portal-gnome | xdg-desktop-portal-cosmic"

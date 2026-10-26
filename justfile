@@ -26,7 +26,7 @@ build: _sidecar
 
 # Start the existing native release build.
 run:
-    ./target/release/crossusage </dev/null
+    exec ./target/release/crossusage </dev/null
 
 # Capture a Linux crash/hang with GDB; Ctrl+C once if the window freezes.
 diagnose:

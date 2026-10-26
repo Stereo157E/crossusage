@@ -88,3 +88,10 @@
 - Split debug sidecar preparation from release builds and stopped rewriting unchanged generated plugins. Added build-script regression tests; a repeated debug sidecar build reused Cargo artifacts.
 - Git prompt diagnosis: gitstatus rejects the worktreeconfig repository extension in its bundled libgit2. A single-worktree clone can retain its effective settings in the local repository config without enabling that extension.
 - Native Linux installation verified after `just build`: GUI, CLI and all 28 bundled plugins installed under the user prefix; replaced the AppImage launcher and added the fork desktop label/icon. Executable and resources match the build. Hyprland reports the native `crossusage` window floating at 600 × 800, positioned below the top-right tray area; configuration validation passed.
+
+## 2026-10-26
+
+- Linux tray uses KSNI 0.3.7 without GTK pointer hooks or AppIndicator package dependencies. Frontend image-resource/tooltip commands preserve all five icon styles, settings changes and embedded-icon reset. Shared menu actions preserve usage summaries, log levels, navigation, restart, about and quit. Windows/macOS retain Tauri's tray backend.
+- Unix environment-discovery shells start in separate sessions, preventing controlling-terminal access from suspending the application job. `just run` remains in the foreground and supports Ctrl+C.
+- Validation: production frontend/native release builds, 91 frontend tests, six native tray tests and ten environment-related core tests passed. Linux desktop checks verified registration, icon export, primary/middle-click actions, menu export, clean quit, distinct provider/bars icons, dynamic tooltips and terminal Ctrl+C cleanup. Windows/macOS runtime checks remain outstanding.
+- Known baseline test issue: two support-bundle redaction tests loop indefinitely; excluded from the broader app test run after reproducing the hang. Their code remains unchanged.

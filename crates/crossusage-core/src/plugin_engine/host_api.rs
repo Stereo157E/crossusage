@@ -145,8 +145,8 @@ fn read_env_from_process(name: &str) -> Option<String> {
     sanitize_env_value(&value)
 }
 
-fn read_command_stdout(program: &str, args: &[&str]) -> Option<String> {
-    let output = Command::new(program).args(args).output().ok()?;
+fn read_command_stdout(command: &mut Command) -> Option<String> {
+    let output = command.output().ok()?;
     if !output.status.success() {
         return None;
     }
@@ -154,7 +154,7 @@ fn read_command_stdout(program: &str, args: &[&str]) -> Option<String> {
 }
 
 fn read_env_value_via_command(program: &str, args: &[&str]) -> Option<String> {
-    let stdout = read_command_stdout(program, args)?;
+    let stdout = read_command_stdout(Command::new(program).args(args))?;
     sanitize_env_value(&stdout)
 }
 
@@ -186,7 +186,25 @@ fn read_env_from_interactive_shell(program: &str, name: &str) -> Option<String> 
         "printf '{}\\n'; printenv {}; printf '{}\\n'",
         START_MARKER, name, END_MARKER
     );
-    let output = read_command_stdout(program, &["-ilc", script.as_str()])?;
+    let mut command = Command::new(program);
+    command.args(["-ilc", script.as_str()]);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // Interactive shells can open /dev/tty even with null stdin. Give only the
+        // lookup shell a new session so it cannot suspend the application's job.
+        // SAFETY: setsid and reading errno are async-signal-safe; no allocations or locks.
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setsid() == -1 {
+                    Err(std::io::Error::last_os_error())
+                } else {
+                    Ok(())
+                }
+            });
+        }
+    }
+    let output = read_command_stdout(&mut command)?;
     parse_interactive_shell_env_output(&output, START_MARKER, END_MARKER)
 }
 
@@ -4519,6 +4537,36 @@ mod tests {
         assert!(path_has_parent_segment("~/../../etc/passwd"));
         assert!(path_has_parent_segment("/tmp/../etc/passwd"));
         assert!(!path_has_parent_segment("~/.config/Cursor/User/globalStorage/state.vscdb"));
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn interactive_env_shell_has_its_own_session_and_no_controlling_terminal() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let shell = dir.path().join("env-shell");
+        std::fs::write(
+            &shell,
+            concat!(
+                "#!/bin/sh\n",
+                "if ( : </dev/tty ) 2>/dev/null; then exit 1; fi\n",
+                "printf '__OPENUSAGE_ENV_START__\\n'\n",
+                "printf '%s:' \"$$\"\n",
+                "ps -o sid= -p \"$$\"\n",
+                "printf '__OPENUSAGE_ENV_END__\\n'\n",
+            ),
+        )
+        .expect("write test shell");
+        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let value =
+            read_env_from_interactive_shell(shell.to_str().unwrap(), "PATH").expect("shell output");
+        let (pid, session) = value.split_once(':').expect("pid:session");
+        let pid: u32 = pid.trim().parse().unwrap();
+        let session: u32 = session.trim().parse().unwrap();
+        assert_eq!(pid, session, "lookup shell must lead a separate session");
+        assert_ne!(session, unsafe { libc::getsid(0) } as u32);
     }
 
     #[test]

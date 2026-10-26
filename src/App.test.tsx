@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import userEvent from "@testing-library/user-event"
+import { Image } from "@tauri-apps/api/image"
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 
 const state = vi.hoisted(() => ({
@@ -496,6 +497,32 @@ describe("App", () => {
     await screen.findByText("Now")
   })
 
+  it.each(["provider", "bars", "donut", "logoBar", "logoGrid"] as const)(
+    "sends the %s tray icon to KSNI on Linux instead of looking up a Tauri tray",
+    async (style) => {
+      const originalInvoke = state.invokeMock.getMockImplementation()
+      state.invokeMock.mockImplementation(async (cmd: string, ...args: unknown[]) => {
+        if (cmd === "get_platform") return "linux"
+        return originalInvoke?.(cmd, ...args)
+      })
+      state.loadMenubarIconStyleMock.mockResolvedValue(style)
+      state.renderTrayBarsIconMock.mockResolvedValue(new Image(42))
+
+      render(<App />)
+
+      await waitFor(() => expect(state.renderTrayBarsIconMock).toHaveBeenCalledWith(
+        expect.objectContaining({ style })
+      ))
+      await waitFor(() => expect(state.invokeMock).toHaveBeenCalledWith(
+        "set_linux_tray_icon", { icon: 42 }
+      ))
+      await waitFor(() => expect(state.invokeMock).toHaveBeenCalledWith(
+        "set_linux_tray_tooltip", { tooltip: expect.any(String) }
+      ))
+      expect(state.trayGetByIdMock).not.toHaveBeenCalled()
+    }
+  )
+
   it("updates tray icon on probe results when plugin has a primary progress", async () => {
     state.invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "get_platform") return "macos"
@@ -819,6 +846,29 @@ describe("App", () => {
 
     await userEvent.click(await screen.findByRole("radio", { name: "Used" }))
     expect(state.saveDisplayModeMock).toHaveBeenCalledWith("used")
+  })
+
+  it("settings changes update the Linux tray after initialization", async () => {
+    const originalInvoke = state.invokeMock.getMockImplementation()
+    state.invokeMock.mockImplementation(async (cmd: string, ...args: unknown[]) => {
+      if (cmd === "get_platform") return "linux"
+      return originalInvoke?.(cmd, ...args)
+    })
+    let nextImageId = 100
+    state.renderTrayBarsIconMock.mockImplementation(async () => new Image(nextImageId++))
+    render(<App />)
+    const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
+    await userEvent.click(settingsButtons[0])
+
+    for (const [label, style] of [["Battery bars", "bars"], ["Pie chart", "donut"]]) {
+      const nextId = nextImageId
+      await userEvent.click(await screen.findByRole("radio", { name: label }))
+      await waitFor(() => expect(state.renderTrayBarsIconMock.mock.calls.at(-1)?.[0].style).toBe(style))
+      await waitFor(() => expect(state.invokeMock.mock.calls.some(([command, args]) =>
+        command === "set_linux_tray_icon" && args.icon >= nextId
+      )).toBe(true))
+    }
+    expect(state.trayGetByIdMock).not.toHaveBeenCalled()
   })
 
   it("settings UI persists menubar icon style change", async () => {

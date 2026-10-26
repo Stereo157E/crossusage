@@ -103,3 +103,9 @@
 - Development: prepare the CLI sidecar in the debug profile from the shared Tauri before-dev hook. Keep release as the packaging script default; preserve unchanged generated plugin and sidecar timestamps so Cargo can reuse its native cache.
 - Claude credentials: prefer the native file store on Linux/Windows; retain Keychain precedence on macOS. Log redacted error details when a desktop probe fails.
 - Local Linux installation: use the native release GUI in `~/.local/bin`, with CLI and bundled resources under `~/.local/lib/crossusage`. Retain the application identifier and data directory; replace the AppImage launcher with a desktop entry labeled `CrossUsage (Fork)`.
+
+## 2026-10-26
+
+- Release launch: keep `just run` in the foreground so Ctrl+C stops the app. On Unix, detach only interactive environment-discovery shells with `setsid` before exec; null stdin alone does not prevent those shells from opening the controlling terminal.
+- Linux tray: integrate KSNI directly rather than patching Tauri or substituting the incompatible AppIndicator GLib library. Enable Tauri's tray and positioner tray features only on Windows/macOS. Keep menu actions shared, dispatch Linux callbacks to the main thread, preserve usage summaries and log-level controls, and use native primary/middle/right-click behavior.
+- Tray rendering: route the existing frontend renderer through a platform adapter. Linux passes Tauri image resource IDs to KSNI via application commands and restores its embedded default icon when no providers are enabled; Windows/macOS retain Tauri's tray API.

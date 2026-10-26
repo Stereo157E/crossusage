@@ -1401,6 +1401,10 @@ pub fn run() {
             usage_alert_sound::play_usage_alert_sound,
             get_os_diagnostics,
             update_tray_usage_summary,
+            #[cfg(target_os = "linux")]
+            tray_linux::set_linux_tray_icon,
+            #[cfg(target_os = "linux")]
+            tray_linux::set_linux_tray_tooltip,
             set_tray_restart_label,
             update_global_shortcut
         ])
@@ -1511,6 +1515,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, event| {
+            #[cfg(target_os = "linux")]
+            if matches!(event, tauri::RunEvent::Exit) {
+                tray_linux::shutdown();
+            }
             if let tauri::RunEvent::ExitRequested { code, api, .. } = event {
                 // Only prevent exit for window close (code=None). Allow Restart and Quit from tray.
                 if code.is_none() {

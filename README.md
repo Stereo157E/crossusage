@@ -119,6 +119,12 @@ Provider usage refreshes continue normally.
 
 **Requirements:** [Bun](https://bun.sh), Rust, platform deps for [Tauri v2](https://v2.tauri.app/start/prerequisites/).
 
+Linux uses a native StatusNotifierItem tray through KSNI; AppIndicator libraries
+are no longer required. Primary click toggles the window, middle-click shows
+stats, and right-click opens the usage summary and actions menu. The desktop
+must provide a StatusNotifier host (for example, a panel with a tray enabled).
+Windows and macOS retain their native Tauri tray implementations.
+
 With [just](https://just.systems), Node.js and npm installed, use the shortcuts below.
 The recipes use `npm exec --yes --package=bun -- bun` for Bun-dependent hooks, so
 a global Bun installation is optional (the first use may download Bun). With a
@@ -136,6 +142,10 @@ global installation, use `just bun=bun dev` or `just bun=bun setup`.
 | `just test-rust` | Rust core and CLI tests; optional Cargo arguments |
 | `just cli list` | Run a CLI command from source |
 | `just bundle` | Platform installer bundles via Tauri; optional Tauri build arguments |
+
+`just run` keeps the app in the foreground: output remains visible and Ctrl+C
+stops it. Environment-discovery shells run in their own sessions so they cannot
+suspend the application's terminal job.
 
 `just dev` prepares the debug CLI sidecar automatically, sharing the native Cargo
 cache with the app. The first start compiles missing dependencies; subsequent
