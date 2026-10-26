@@ -15,7 +15,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useAppUiStore } from "@/stores/app-ui-store";
 import { GripVertical } from "lucide-react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { disable as disableAutostart } from "@tauri-apps/plugin-autostart";
@@ -874,6 +875,22 @@ function LocalApiSection() {
 }
 
 function UsageHistorySection() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [highlighted, setHighlighted] = useState(false);
+  const requested = useAppUiStore((s) => s.usageHistoryRequested);
+  const clearRequest = useAppUiStore((s) => s.clearUsageHistoryRequest);
+  useEffect(() => {
+    if (!requested) return;
+    sectionRef.current?.scrollIntoView({ block: "start" });
+    sectionRef.current?.focus({ preventScroll: true });
+    setHighlighted(true);
+    clearRequest();
+  }, [requested, clearRequest]);
+  useEffect(() => {
+    if (!highlighted) return;
+    const timer = window.setTimeout(() => setHighlighted(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [highlighted]);
   const [persist, setPersist] = useState(false);
   const [retentionDays, setRetentionDays] = useState(DEFAULT_USAGE_HISTORY_RETENTION_DAYS);
   const [hydrated, setHydrated] = useState(false);
@@ -961,7 +978,7 @@ function UsageHistorySection() {
   };
 
   return (
-    <section>
+    <section ref={sectionRef} tabIndex={-1} aria-label="Usage history" className="scroll-mt-14">
       <h3 className="text-lg font-semibold mb-0">Usage history</h3>
       <p className="text-sm text-muted-foreground mb-2">
         Optional local SQLite history on this device — never uploaded. With saving enabled:{" "}
@@ -969,7 +986,7 @@ function UsageHistorySection() {
         <strong>daily token totals</strong> from Claude/Codex local logs (ccusage) and Cursor local transcripts (token counts only — no dollar cost in export).
         For Cursor billing dollars, use the Cursor detail page → Billing usage table.
       </p>
-      <label className="flex items-center gap-2 text-sm select-none text-foreground mb-3">
+      <label className={`flex items-center gap-2 text-sm select-none text-foreground mb-3 rounded-md transition-colors motion-reduce:transition-none ${highlighted ? "bg-primary/10 ring-2 ring-primary ring-offset-4 ring-offset-background" : ""}`}>
         <Checkbox
           checked={persist}
           disabled={!isTauri()}
@@ -1316,6 +1333,10 @@ export function SettingsPage({
   const isModern = presentation === "modern";
   type ModernSettingsTab = "general" | "tray" | "appearance" | "providers" | "advanced";
   const [modernTab, setModernTab] = useState<ModernSettingsTab>("general");
+  const usageHistoryRequested = useAppUiStore((s) => s.usageHistoryRequested);
+  useEffect(() => {
+    if (isModern && usageHistoryRequested) setModernTab("advanced");
+  }, [isModern, usageHistoryRequested]);
   const showModernSection = (tab: ModernSettingsTab | ModernSettingsTab[]) => {
     if (!isModern) return true;
     const tabs = Array.isArray(tab) ? tab : [tab];

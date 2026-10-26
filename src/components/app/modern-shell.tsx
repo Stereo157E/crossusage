@@ -344,6 +344,10 @@ export function ModernShell({
                   persistEnabled={persistEnabled}
                   nowMs={nowMs}
                   onSelectProvider={setActiveView}
+                  onOpenUsageHistory={() => {
+                    useAppUiStore.getState().openUsageHistory()
+                    setScreen("settings")
+                  }}
                 />
                 {showTotalSpend ? (
                   <TotalSpendCard

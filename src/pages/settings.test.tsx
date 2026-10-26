@@ -1,4 +1,5 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react"
+import { useAppUiStore } from "@/stores/app-ui-store"
 import type { ReactNode } from "react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -169,6 +170,27 @@ beforeEach(() => {
 })
 
 describe("SettingsPage", () => {
+  it.each(["classic", "modern"] as const)("opens and briefly highlights usage history in %s settings", (presentation) => {
+    vi.useFakeTimers()
+    const scroll = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll })
+    useAppUiStore.getState().openUsageHistory()
+    try {
+      renderSettings({ ...defaultProps, presentation })
+      const section = screen.getByRole("region", { name: "Usage history" })
+      const label = screen.getByRole("checkbox", { name: "Save usage snapshots after successful refreshes" }).closest("label")
+      expect(section).toHaveFocus()
+      expect(scroll).toHaveBeenCalledWith({ block: "start" })
+      expect(label).toHaveClass("ring-2")
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(label).not.toHaveClass("ring-2")
+    } finally {
+      cleanup()
+      vi.useRealTimers()
+      useAppUiStore.getState().resetState()
+      Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView")
+    }
+  })
   it("toggles plugins", async () => {
     const onToggle = vi.fn()
     renderSettings({

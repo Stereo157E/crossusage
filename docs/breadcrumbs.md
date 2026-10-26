@@ -115,3 +115,9 @@
 - Integrated CrossUsage v1.6.1 with OpenUsage v0.7.14–v0.7.15 provider updates and build optimizations. Preserved native Linux integration, disabled updates, hidden-polls navigation, credential precedence, and incremental sidecar preparation. Upstream fixes gate Windows decoders and test helpers, remove the unused Cursor path helper, and restore shutdown cache flushing.
 - Audited changed provider request/response fields against the shared core host redaction lists: existing credential, profile, account, and reset-credit identifier coverage remains applicable; new usage fields contain amounts, percentages, periods, and plan labels.
 - Validation: frontend production build, 1,577 frontend tests, five build-script tests, five CLI tests, 182 core tests, and 56 desktop tests passed. The two documented environment-dependent ccusage subprocess tests still fail, including outside the sandbox. Desktop/core/CLI compile checks no longer report the seven unused-code warnings. The upstream support-bundle redaction fix also resolves the previously recorded test hangs.
+
+- 2026-10-26: Made the dashboard usage-history reminder actionable and dismissible in both layouts. Settings scrolls to and focuses Usage history; dismissing the final row removes the banner. Validation: 37 targeted frontend tests and production build passed.
+
+- 2026-10-26: Added a temporary usage-history toggle highlight and immediate dashboard reminder removal after enabling history. Preserve other active insights. Regression coverage includes live preference updates, stale initial loads, and timed highlight removal.
+
+- 2026-10-26: Fixed reminder navigation leaving modern Settings on General, where Usage history was not mounted. Added regression coverage for both classic and modern presentations; target scroll margin clears the sticky settings tabs. All 41 targeted frontend tests passed.

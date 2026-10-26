@@ -1137,9 +1137,12 @@ export async function loadPersistUsageHistory(): Promise<boolean> {
   return typeof stored === "boolean" ? stored : false;
 }
 
+export const PERSIST_USAGE_HISTORY_CHANGED_EVENT = "persist-usage-history-changed";
+
 export async function savePersistUsageHistory(value: boolean): Promise<void> {
   await store.set(PERSIST_USAGE_HISTORY_KEY, value);
   await store.save();
+  window.dispatchEvent(new CustomEvent(PERSIST_USAGE_HISTORY_CHANGED_EVENT, { detail: value }));
 }
 
 export async function loadUsageHistoryRetentionDays(): Promise<number> {

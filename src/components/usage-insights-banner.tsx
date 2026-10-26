@@ -17,6 +17,9 @@ import {
   type HistoryInsightTightest,
 } from "@/lib/usage-history-insights"
 import { cn } from "@/lib/utils"
+import { useAppUiStore } from "@/stores/app-ui-store"
+
+const HISTORY_HINT_DISMISS_KEY = "usageHistoryHintDismissed"
 
 type UsageInsightsBannerProps = {
   insights: UsageInsight[]
@@ -27,6 +30,7 @@ type UsageInsightsBannerProps = {
   persistEnabled: boolean
   nowMs: number
   onSelectProvider?: (instanceId: string) => void
+  onOpenUsageHistory?: () => void
   className?: string
 }
 
@@ -45,9 +49,20 @@ export function UsageInsightsBanner({
   persistEnabled,
   nowMs,
   onSelectProvider,
+  onOpenUsageHistory,
   className,
 }: UsageInsightsBannerProps) {
   const [, bump] = useState(0)
+  const openUsageHistory = useAppUiStore((s) => s.openUsageHistory)
+  const [historyHintDismissed, setHistoryHintDismissed] = useState(
+    () => {
+      try {
+        return window.localStorage.getItem(HISTORY_HINT_DISMISS_KEY) === "true"
+      } catch {
+        return false
+      }
+    },
+  )
 
   const visibleInsights = useMemo(
     () => filterDismissedInsights(insights, nowMs),
@@ -66,7 +81,7 @@ export function UsageInsightsBanner({
     rollup30 != null &&
     countDistinctDaysInWindow(dailyRows, rollup30.currentWindow) >= 7
 
-  const showRollupHint = !persistEnabled
+  const showRollupHint = !persistEnabled && !historyHintDismissed
   const hasInsights = visibleInsights.length > 0
   const hasHistoryTightest = persistEnabled && historyTightest.length > 0
   const hasRollup = rollup != null
@@ -178,7 +193,30 @@ export function UsageInsightsBanner({
       ) : null}
 
       {showRollupHint ? (
-        <p className="text-muted-foreground">Enable usage history for weekly totals.</p>
+        <div className="flex items-start gap-1 text-muted-foreground">
+          <button
+            type="button"
+            className="flex-1 text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            onClick={onOpenUsageHistory ?? openUsageHistory}
+          >
+            Enable usage history for weekly totals.
+          </button>
+          <button
+            type="button"
+            className="shrink-0 px-1 hover:text-foreground"
+            aria-label="Dismiss usage history reminder"
+            onClick={() => {
+              try {
+                window.localStorage.setItem(HISTORY_HINT_DISMISS_KEY, "true")
+              } catch (error) {
+                console.error("Could not save usage history reminder dismissal", error)
+              }
+              setHistoryHintDismissed(true)
+            }}
+          >
+            ×
+          </button>
+        </div>
       ) : null}
     </section>
   )

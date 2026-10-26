@@ -123,3 +123,9 @@
 
 - Upstream 1.6.1 integration: retain the native Linux tray, platform-specific tray dependencies, disabled binary updater, file-first Claude credentials, and real incremental debug sidecar. Flush the local HTTP cache on programmatic exit and final shutdown before stopping KSNI.
 - Plugin packaging: apply the same runtime-file filter when copying and comparing bundled plugins, preserving unchanged timestamps while excluding tests, test helpers, and Markdown.
+
+- 2026-10-26: Usage-history dashboard reminder: open Settings at the Usage history section; persist explicit dismissal locally without enabling history automatically.
+
+- 2026-10-26: Highlight the usage-history toggle for three seconds after reminder navigation; publish saved history preference changes to mounted dashboard subscribers.
+
+- 2026-10-26: Usage-history navigation selects the Advanced settings tab before mounting and highlighting the target in modern layout.
