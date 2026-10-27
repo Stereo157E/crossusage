@@ -121,3 +121,5 @@
 - 2026-10-26: Added a temporary usage-history toggle highlight and immediate dashboard reminder removal after enabling history. Preserve other active insights. Regression coverage includes live preference updates, stale initial loads, and timed highlight removal.
 
 - 2026-10-26: Fixed reminder navigation leaving modern Settings on General, where Usage history was not mounted. Added regression coverage for both classic and modern presentations; target scroll margin clears the sticky settings tabs. All 41 targeted frontend tests passed.
+
+- 2026-10-28: Fixed tray menu "Show Stats" / "Go to Settings" / "About CrossUsage" doing nothing in modern layout. Rust already emits `tray:navigate` / `tray:show-about`; only the classic shell listened. Added `useTrayNavigation` hook wired into ModernShell (settings → settings screen, other views → dashboard; about → dialog). Validation: 4 new hook tests, full suite 1587 tests + tsc green.

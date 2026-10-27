@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
 import { useAppVersion } from "@/hooks/app/use-app-version"
+import { useTrayNavigation } from "@/hooks/app/use-tray-navigation"
 import { useTrayRestartBridge } from "@/hooks/app/use-tray-restart-bridge"
 import { useWeeklyRollup } from "@/hooks/use-weekly-rollup"
 import { useHistoryInsights } from "@/hooks/use-history-insights"
@@ -105,6 +106,15 @@ export function ModernShell({
       setShowAbout: s.setShowAbout,
     })),
   )
+  const setActiveView = useAppUiStore((s) => s.setActiveView)
+
+  useTrayNavigation(
+    (view) => {
+      setActiveView(view)
+      setScreen(view === "settings" ? "settings" : "dashboard")
+    },
+    () => setShowAbout(true),
+  )
 
   const { pluginsMeta, pluginSettings } = useAppPluginStore(
     useShallow((s) => ({
@@ -140,8 +150,6 @@ export function ModernShell({
     scheduleRollupReload()
     scheduleHistoryInsightsReload()
   }, [probeStamp, scheduleRollupReload, scheduleHistoryInsightsReload])
-
-  const setActiveView = useAppUiStore((s) => s.setActiveView)
 
   useEffect(() => {
     if (!pluginSettings || !layout.hydrated) return

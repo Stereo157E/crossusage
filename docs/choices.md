@@ -129,3 +129,5 @@
 - 2026-10-26: Highlight the usage-history toggle for three seconds after reminder navigation; publish saved history preference changes to mounted dashboard subscribers.
 
 - 2026-10-26: Usage-history navigation selects the Advanced settings tab before mounting and highlighting the target in modern layout.
+
+- 2026-10-28: Tray menu navigation for modern layout: reuse the shared `tray:navigate` / `tray:show-about` events via a small `useTrayNavigation` hook mounted by ModernShell; leave the classic `usePanel` listeners untouched. "settings" maps to the settings screen, any other view payload to the dashboard.
