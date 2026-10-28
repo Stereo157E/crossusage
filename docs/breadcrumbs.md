@@ -123,3 +123,5 @@
 - 2026-10-26: Fixed reminder navigation leaving modern Settings on General, where Usage history was not mounted. Added regression coverage for both classic and modern presentations; target scroll margin clears the sticky settings tabs. All 41 targeted frontend tests passed.
 
 - 2026-10-28: Fixed tray menu "Show Stats" / "Go to Settings" / "About CrossUsage" doing nothing in modern layout. Rust already emits `tray:navigate` / `tray:show-about`; only the classic shell listened. Added `useTrayNavigation` hook wired into ModernShell (settings → settings screen, other views → dashboard; about → dialog). Validation: 4 new hook tests, full suite 1587 tests + tsc green.
+
+- 2026-10-28: Modern layout can now hide the window in-app: Escape invokes `hide_panel` via the new `useEscapeHidePanel` hook (skipped while the About dialog is open, while a dialog already handled Escape, or while typing in an input/contenteditable); on macOS the modern shell gained the tray arrow and an "X" hide button in the nav row, matching the classic popover chrome. Classic shell and `usePanel` untouched. Validation: 8 new hook regression tests, full suite 1595 tests + `tsc --noEmit` green.

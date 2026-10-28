@@ -131,3 +131,5 @@
 - 2026-10-26: Usage-history navigation selects the Advanced settings tab before mounting and highlighting the target in modern layout.
 
 - 2026-10-28: Tray menu navigation for modern layout: reuse the shared `tray:navigate` / `tray:show-about` events via a small `useTrayNavigation` hook mounted by ModernShell; leave the classic `usePanel` listeners untouched. "settings" maps to the settings screen, any other view payload to the dashboard.
+
+- 2026-10-28: In-app hiding for the modern layout: new `useEscapeHidePanel` hook mounted by ModernShell reuses the `hide_panel` command instead of touching the classic `usePanel` handler. Escape skips hiding while the About dialog is open (`showAbout` gate, same as classic), while the Escape event is already `defaultPrevented` (dialogs handle Escape themselves), or while focus is in an input/textarea/contenteditable. macOS popover chrome (tray arrow + "X" hide button) is replicated in the modern nav row under the same `isTauri() && platform === "macos"` condition as the classic shell.

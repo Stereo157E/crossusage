@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useShallow } from "zustand/react/shallow"
+import { invoke, isTauri } from "@tauri-apps/api/core"
+import { X } from "lucide-react"
 import { LiquidGlassFilter } from "@/components/liquid-glass-filter"
 import { OnboardingWizard } from "@/components/onboarding-wizard"
 import { PanelFooter } from "@/components/panel-footer"
@@ -16,6 +18,8 @@ import { Button } from "@/components/ui/button"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
 import { useAppVersion } from "@/hooks/app/use-app-version"
+import { useEscapeHidePanel } from "@/hooks/app/use-escape-hide-panel"
+import { usePlatform } from "@/hooks/app/use-platform"
 import { useTrayNavigation } from "@/hooks/app/use-tray-navigation"
 import { useTrayRestartBridge } from "@/hooks/app/use-tray-restart-bridge"
 import { useWeeklyRollup } from "@/hooks/use-weekly-rollup"
@@ -107,6 +111,13 @@ export function ModernShell({
     })),
   )
   const setActiveView = useAppUiStore((s) => s.setActiveView)
+
+  // Same in-app hide behavior as the classic shell: Escape hides the window,
+  // but not while the About dialog handles Escape itself.
+  useEscapeHidePanel(!showAbout)
+
+  const platform = usePlatform()
+  const macPopoverChrome = isTauri() && platform === "macos"
 
   useTrayNavigation(
     (view) => {
@@ -279,6 +290,7 @@ export function ModernShell({
       data-density={modernDensity}
     >
       <LiquidGlassFilter active={themeMode === "glass"} />
+      {macPopoverChrome ? <div className="tray-arrow" aria-hidden="true" /> : null}
       <div
         ref={panelMotionRef}
         className="app-panel-surface relative w-full overflow-hidden rounded-[18px] select-none flex flex-col min-h-[320px]"
@@ -325,6 +337,18 @@ export function ModernShell({
               ) : null}
             </Button>
           ))}
+          {macPopoverChrome ? (
+            <button
+              type="button"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Hide window"
+              onClick={() => {
+                void invoke("hide_panel")
+              }}
+            >
+              <X className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          ) : null}
         </nav>
 
         <div className="relative flex min-h-0 flex-1 flex-col px-3 pt-2 pb-1.5">
