@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { loadUsageHistoryHintDismissed, saveUsageHistoryHintDismissed } from "@/lib/settings"
 import { UsageSparkline } from "@/components/usage-sparkline"
 import { dismissInsight, filterDismissedInsights } from "@/lib/insight-dismiss"
 import type { UsageInsight } from "@/lib/usage-insights"
@@ -19,7 +20,6 @@ import {
 import { cn } from "@/lib/utils"
 import { useAppUiStore } from "@/stores/app-ui-store"
 
-const HISTORY_HINT_DISMISS_KEY = "usageHistoryHintDismissed"
 
 type UsageInsightsBannerProps = {
   insights: UsageInsight[]
@@ -54,15 +54,19 @@ export function UsageInsightsBanner({
 }: UsageInsightsBannerProps) {
   const [, bump] = useState(0)
   const openUsageHistory = useAppUiStore((s) => s.openUsageHistory)
-  const [historyHintDismissed, setHistoryHintDismissed] = useState(
-    () => {
-      try {
-        return window.localStorage.getItem(HISTORY_HINT_DISMISS_KEY) === "true"
-      } catch {
-        return false
-      }
-    },
-  )
+  // null until loaded from the settings store, so a dismissed hint never flashes.
+  const [historyHintDismissed, setHistoryHintDismissed] = useState<boolean | null>(null)
+  useEffect(() => {
+    let mounted = true
+    loadUsageHistoryHintDismissed()
+      .then((dismissed) => {
+        if (mounted) setHistoryHintDismissed(dismissed)
+      })
+      .catch((error) => console.error("loadUsageHistoryHintDismissed:", error))
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const visibleInsights = useMemo(
     () => filterDismissedInsights(insights, nowMs),
@@ -81,7 +85,7 @@ export function UsageInsightsBanner({
     rollup30 != null &&
     countDistinctDaysInWindow(dailyRows, rollup30.currentWindow) >= 7
 
-  const showRollupHint = !persistEnabled && !historyHintDismissed
+  const showRollupHint = !persistEnabled && historyHintDismissed === false
   const hasInsights = visibleInsights.length > 0
   const hasHistoryTightest = persistEnabled && historyTightest.length > 0
   const hasRollup = rollup != null
@@ -206,12 +210,10 @@ export function UsageInsightsBanner({
             className="shrink-0 px-1 hover:text-foreground"
             aria-label="Dismiss usage history reminder"
             onClick={() => {
-              try {
-                window.localStorage.setItem(HISTORY_HINT_DISMISS_KEY, "true")
-              } catch (error) {
-                console.error("Could not save usage history reminder dismissal", error)
-              }
               setHistoryHintDismissed(true)
+              saveUsageHistoryHintDismissed().catch((error) => {
+                console.error("Could not save usage history reminder dismissal", error)
+              })
             }}
           >
             ×

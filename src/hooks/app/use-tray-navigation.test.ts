@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { isTauriMock, listenMock, unlistenMock } = vi.hoisted(() => ({
+const { isTauriMock, listenMock, unlistenMock, invokeMock } = vi.hoisted(() => ({
+  invokeMock: vi.fn(() => Promise.resolve(null)),
   isTauriMock: vi.fn(),
   listenMock: vi.fn(),
   unlistenMock: vi.fn(),
@@ -9,6 +10,7 @@ const { isTauriMock, listenMock, unlistenMock } = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => isTauriMock(),
+  invoke: invokeMock,
 }))
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -52,6 +54,8 @@ describe("useTrayNavigation", () => {
 
     expect(onNavigate).toHaveBeenNthCalledWith(1, "settings")
     expect(onNavigate).toHaveBeenNthCalledWith(2, "home")
+    // Handled via event: the stored copy must be cleared so a remount does not replay it.
+    expect(invokeMock).toHaveBeenCalledWith("consume_pending_tray_navigation")
   })
 
   it("calls onShowAbout for tray:show-about", async () => {

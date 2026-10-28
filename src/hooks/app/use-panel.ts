@@ -4,6 +4,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow, PhysicalSize, currentMonitor } from "@tauri-apps/api/window"
 import type { ActiveView } from "@/components/side-nav"
+import { clearPendingTrayNavigation } from "@/hooks/app/use-pending-tray-navigation"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import { PANEL_WIDTH, computeMaxPanelHeight } from "@/lib/panel-height"
 
@@ -173,6 +174,7 @@ export function usePanel({
 
     async function setup() {
       const u1 = await listen<string>("tray:navigate", (event) => {
+        clearPendingTrayNavigation()
         setActiveView(event.payload as ActiveView)
         focusContainer()
       })
@@ -183,6 +185,7 @@ export function usePanel({
       unlisteners.push(u1)
 
       const u2 = await listen("tray:show-about", () => {
+        clearPendingTrayNavigation()
         setShowAbout(true)
         focusContainer()
       })

@@ -9,6 +9,13 @@ import { invoke, isTauri } from "@tauri-apps/api/core"
  * (`tray::PendingTrayNavigation`); we consume it exactly once here and apply
  * it the same way the event handlers do.
  */
+/** The event path handled the click: drop the stored copy so a later mount does not replay it. */
+export function clearPendingTrayNavigation() {
+  invoke("consume_pending_tray_navigation").catch((error) => {
+    console.error("Failed to clear pending tray navigation:", error)
+  })
+}
+
 export function usePendingTrayNavigation(
   onNavigate: (view: string) => void,
   onShowAbout: () => void,

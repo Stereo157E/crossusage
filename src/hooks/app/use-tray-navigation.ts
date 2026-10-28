@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { isTauri } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
+import { clearPendingTrayNavigation } from "@/hooks/app/use-pending-tray-navigation"
 
 /**
  * Tray menu navigation bridge. The Rust side (`tray::handle_menu_action`) shows
@@ -24,6 +25,7 @@ export function useTrayNavigation(
 
     async function setup() {
       const u1 = await listen<string>("tray:navigate", (event) => {
+        clearPendingTrayNavigation()
         onNavigateRef.current(event.payload)
       })
       if (cancelled) {
@@ -33,6 +35,7 @@ export function useTrayNavigation(
       unlisteners.push(u1)
 
       const u2 = await listen("tray:show-about", () => {
+        clearPendingTrayNavigation()
         onShowAboutRef.current()
       })
       if (cancelled) {
