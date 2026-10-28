@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import type { RefObject } from "react"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow, PhysicalSize, currentMonitor } from "@tauri-apps/api/window"
 import type { ActiveView } from "@/components/side-nav"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
-
-const PANEL_WIDTH = 600
-const MAX_HEIGHT_FALLBACK_PX = 560
-const MAX_HEIGHT_FRACTION_OF_MONITOR = 0.76
+import { PANEL_WIDTH, computeMaxPanelHeight } from "@/lib/panel-height"
 
 type UsePanelArgs = {
   activeView: ActiveView
@@ -28,6 +26,91 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return false
 }
 
+/**
+ * macOS popover window sync: track the panel content height, clamp it to 76%
+ * of the monitor, and resize the window to match. Shared by the classic and
+ * modern shells. Returns the logical clamp in CSS pixels (null until known).
+ * `contentKey` should change when panel content changes (view, plugins), to
+ * re-sync immediately; layout changes are also picked up by the observer.
+ */
+export function usePanelWindowSync(
+  containerRef: RefObject<HTMLDivElement | null>,
+  contentKey: string,
+) {
+  const [maxPanelHeightPx, setMaxPanelHeightPx] = useState<number | null>(null)
+  const maxPanelHeightPxRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!isTauri()) return
+    const container = containerRef.current
+    if (!container) return
+
+    /** Linux/Windows: native resizable window — do not force outer `setSize` (it blocks user resize). */
+    const platformRef = { current: null as string | null }
+
+    const resizeWindow = async () => {
+      const factor = window.devicePixelRatio
+      const width = Math.ceil(PANEL_WIDTH * factor)
+      const desiredHeightLogical = Math.max(1, container.scrollHeight)
+
+      let monitorHeightPhysical: number | null = null
+      try {
+        const monitor = await currentMonitor()
+        if (monitor) {
+          monitorHeightPhysical = monitor.size.height
+        }
+      } catch {
+        // fall through to fallback
+      }
+
+      const { logicalPx, physicalPx } = computeMaxPanelHeight(
+        monitorHeightPhysical,
+        factor,
+        Number(window.screen?.availHeight),
+      )
+
+      if (maxPanelHeightPxRef.current !== logicalPx) {
+        maxPanelHeightPxRef.current = logicalPx
+        setMaxPanelHeightPx(logicalPx)
+      }
+
+      if (platformRef.current === null) {
+        try {
+          platformRef.current = await invoke<string>("get_platform")
+        } catch {
+          platformRef.current = ""
+        }
+      }
+
+      // macOS undecorated popover: keep syncing outer window to content height + fixed width.
+      if (platformRef.current !== "macos") {
+        return
+      }
+
+      const desiredHeightPhysical = Math.ceil(desiredHeightLogical * factor)
+      const height = Math.ceil(Math.min(desiredHeightPhysical, physicalPx))
+
+      try {
+        const currentWindow = getCurrentWindow()
+        await currentWindow.setSize(new PhysicalSize(width, height))
+      } catch (e) {
+        console.error("Failed to resize window:", e)
+      }
+    }
+
+    resizeWindow()
+
+    const observer = new ResizeObserver(() => {
+      resizeWindow()
+    })
+    observer.observe(container)
+
+    return () => observer.disconnect()
+  }, [contentKey])
+
+  return maxPanelHeightPx
+}
+
 export function usePanel({
   activeView,
   setActiveView,
@@ -38,8 +121,10 @@ export function usePanel({
   const containerRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollDown, setCanScrollDown] = useState(false)
-  const [maxPanelHeightPx, setMaxPanelHeightPx] = useState<number | null>(null)
-  const maxPanelHeightPxRef = useRef<number | null>(null)
+  const maxPanelHeightPx = usePanelWindowSync(
+    containerRef,
+    `${activeView}:${displayPlugins.map((p) => p.meta.id).join(",")}`,
+  )
   const focusContainer = useCallback(() => {
     window.requestAnimationFrame(() => {
       containerRef.current?.focus({ preventScroll: true })
@@ -148,77 +233,6 @@ export function usePanel({
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [activeView, displayPlugins, setActiveView, showAbout])
-
-  useEffect(() => {
-    if (!isTauri()) return
-    const container = containerRef.current
-    if (!container) return
-
-    /** Linux/Windows: native resizable window — do not force outer `setSize` (it blocks user resize). */
-    const platformRef = { current: null as string | null }
-
-    const resizeWindow = async () => {
-      const factor = window.devicePixelRatio
-      const width = Math.ceil(PANEL_WIDTH * factor)
-      const desiredHeightLogical = Math.max(1, container.scrollHeight)
-
-      let maxHeightPhysical: number | null = null
-      let maxHeightLogical: number | null = null
-
-      try {
-        const monitor = await currentMonitor()
-        if (monitor) {
-          maxHeightPhysical = Math.floor(monitor.size.height * MAX_HEIGHT_FRACTION_OF_MONITOR)
-          maxHeightLogical = Math.floor(maxHeightPhysical / factor)
-        }
-      } catch {
-        // fall through to fallback
-      }
-
-      if (maxHeightLogical === null) {
-        const screenAvailHeight = Number(window.screen?.availHeight) || MAX_HEIGHT_FALLBACK_PX
-        maxHeightLogical = Math.floor(screenAvailHeight * MAX_HEIGHT_FRACTION_OF_MONITOR)
-        maxHeightPhysical = Math.floor(maxHeightLogical * factor)
-      }
-
-      if (maxPanelHeightPxRef.current !== maxHeightLogical) {
-        maxPanelHeightPxRef.current = maxHeightLogical
-        setMaxPanelHeightPx(maxHeightLogical)
-      }
-
-      if (platformRef.current === null) {
-        try {
-          platformRef.current = await invoke<string>("get_platform")
-        } catch {
-          platformRef.current = ""
-        }
-      }
-
-      // macOS undecorated popover: keep syncing outer window to content height + fixed width.
-      if (platformRef.current !== "macos") {
-        return
-      }
-
-      const desiredHeightPhysical = Math.ceil(desiredHeightLogical * factor)
-      const height = Math.ceil(Math.min(desiredHeightPhysical, maxHeightPhysical!))
-
-      try {
-        const currentWindow = getCurrentWindow()
-        await currentWindow.setSize(new PhysicalSize(width, height))
-      } catch (e) {
-        console.error("Failed to resize window:", e)
-      }
-    }
-
-    resizeWindow()
-
-    const observer = new ResizeObserver(() => {
-      resizeWindow()
-    })
-    observer.observe(container)
-
-    return () => observer.disconnect()
-  }, [activeView, displayPlugins])
 
   useEffect(() => {
     const el = scrollRef.current

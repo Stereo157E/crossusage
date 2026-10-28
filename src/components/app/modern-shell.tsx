@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useShallow } from "zustand/react/shallow"
 import { invoke, isTauri } from "@tauri-apps/api/core"
@@ -19,6 +19,7 @@ import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
 import { useAppVersion } from "@/hooks/app/use-app-version"
 import { useEscapeHidePanel } from "@/hooks/app/use-escape-hide-panel"
+import { usePanelWindowSync } from "@/hooks/app/use-panel"
 import { usePlatform } from "@/hooks/app/use-platform"
 import { useTrayNavigation } from "@/hooks/app/use-tray-navigation"
 import { usePendingTrayNavigation } from "@/hooks/app/use-pending-tray-navigation"
@@ -286,6 +287,14 @@ export function ModernShell({
   )
   const panelMotionRef = useMotionPointer(!reduceAnimations)
 
+  // Same macOS popover height clamp as the classic shell: 76% of the monitor,
+  // applied to the surface and synced to the window size.
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  const maxPanelHeightPx = usePanelWindowSync(
+    surfaceRef,
+    `${screen}:${probeStamp}`,
+  )
+
   return (
     <div
       className="app-popover-shell w-full bg-transparent"
@@ -294,9 +303,17 @@ export function ModernShell({
       <LiquidGlassFilter active={themeMode === "glass"} />
       {macPopoverChrome ? <div className="tray-arrow" aria-hidden="true" /> : null}
       <div
-        ref={panelMotionRef}
+        ref={(el) => {
+          surfaceRef.current = el
+          panelMotionRef(el)
+        }}
         className="app-panel-surface relative w-full overflow-hidden rounded-[18px] select-none flex flex-col min-h-[320px]"
         data-ui-layout="modern"
+        style={
+          macPopoverChrome && maxPanelHeightPx
+            ? { maxHeight: `${maxPanelHeightPx}px` }
+            : undefined
+        }
       >
         <nav
           className="flex gap-1 px-3 pt-2 pb-1 border-b border-border/50"
