@@ -1445,6 +1445,7 @@ pub fn run() {
             #[cfg(target_os = "linux")]
             tray_linux::set_linux_tray_tooltip,
             set_tray_restart_label,
+            tray::consume_pending_tray_navigation,
             update_global_shortcut
         ])
         .setup(|app| {
@@ -1499,6 +1500,9 @@ pub fn run() {
                 app_data_dir,
                 app_version: app.package_info().version.to_string(),
             }));
+
+            // Tray navigation fallback for clicks that race webview startup (events are not buffered).
+            app.manage(tray::PendingTrayNavigation::default());
 
             tray::create(app.handle())?;
 

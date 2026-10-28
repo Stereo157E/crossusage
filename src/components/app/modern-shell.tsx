@@ -21,6 +21,7 @@ import { useAppVersion } from "@/hooks/app/use-app-version"
 import { useEscapeHidePanel } from "@/hooks/app/use-escape-hide-panel"
 import { usePlatform } from "@/hooks/app/use-platform"
 import { useTrayNavigation } from "@/hooks/app/use-tray-navigation"
+import { usePendingTrayNavigation } from "@/hooks/app/use-pending-tray-navigation"
 import { useTrayRestartBridge } from "@/hooks/app/use-tray-restart-bridge"
 import { useWeeklyRollup } from "@/hooks/use-weekly-rollup"
 import { useHistoryInsights } from "@/hooks/use-history-insights"
@@ -119,13 +120,14 @@ export function ModernShell({
   const platform = usePlatform()
   const macPopoverChrome = isTauri() && platform === "macos"
 
-  useTrayNavigation(
-    (view) => {
-      setActiveView(view)
-      setScreen(view === "settings" ? "settings" : "dashboard")
-    },
-    () => setShowAbout(true),
-  )
+  const handleTrayNavigate = (view: string) => {
+    setActiveView(view)
+    setScreen(view === "settings" ? "settings" : "dashboard")
+  }
+  const handleTrayShowAbout = () => setShowAbout(true)
+  useTrayNavigation(handleTrayNavigate, handleTrayShowAbout)
+  // Same mapping, covering tray clicks made before the listeners above registered.
+  usePendingTrayNavigation(handleTrayNavigate, handleTrayShowAbout)
 
   const { pluginsMeta, pluginSettings } = useAppPluginStore(
     useShallow((s) => ({

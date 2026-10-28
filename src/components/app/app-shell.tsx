@@ -11,6 +11,7 @@ import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
 import { useAppVersion } from "@/hooks/app/use-app-version"
 import { usePanel } from "@/hooks/app/use-panel"
+import { usePendingTrayNavigation } from "@/hooks/app/use-pending-tray-navigation"
 import { usePlatform } from "@/hooks/app/use-platform"
 import { useTrayRestartBridge } from "@/hooks/app/use-tray-restart-bridge"
 import type { UpdateStatus } from "@/hooks/use-app-update"
@@ -89,6 +90,10 @@ export function AppShell({
     setShowAbout,
     displayPlugins,
   })
+
+  // Tray clicks made before `usePanel` registered its listeners are dropped
+  // (events are not buffered); Rust stores the latest one and we consume it.
+  usePendingTrayNavigation(setActiveView, () => setShowAbout(true))
 
   const appVersion = useAppVersion()
   const pollsBadge = useProductPollsBadge(appVersion)

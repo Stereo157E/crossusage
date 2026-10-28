@@ -106,17 +106,45 @@ pub(crate) fn set_stored_log_level(app_handle: &AppHandle, level: log::LevelFilt
     log::set_max_level(level);
 }
 
+/// Latest tray navigation request the frontend has not consumed yet.
+/// Tauri app events are not buffered: a menu click made before the webview
+/// registers its listeners is dropped, so the click also stores its target
+/// here and the frontend retrieves it once via
+/// `consume_pending_tray_navigation` on startup.
+#[derive(Default)]
+pub struct PendingTrayNavigation(std::sync::Mutex<Option<String>>);
+
+impl PendingTrayNavigation {
+    pub fn set(&self, target: &str) {
+        *self.0.lock().expect("pending tray navigation poisoned") = Some(target.to_string());
+    }
+
+    pub fn take(&self) -> Option<String> {
+        self.0.lock().expect("pending tray navigation poisoned").take()
+    }
+}
+
+#[tauri::command]
+pub fn consume_pending_tray_navigation(
+    state: tauri::State<'_, PendingTrayNavigation>,
+) -> Option<String> {
+    state.take()
+}
+
 pub(crate) fn handle_menu_action(app_handle: &AppHandle, action: &str) {
     match action {
         "show_stats" => {
+            app_handle.state::<PendingTrayNavigation>().set("home");
             show_panel(app_handle);
             let _ = app_handle.emit("tray:navigate", "home");
         }
         "go_to_settings" => {
+            app_handle.state::<PendingTrayNavigation>().set("settings");
             show_panel(app_handle);
             let _ = app_handle.emit("tray:navigate", "settings");
         }
         "about" => {
+            app_handle.state::<PendingTrayNavigation>().set("about");
             show_panel(app_handle);
             let _ = app_handle.emit("tray:show-about", ());
         }
@@ -156,5 +184,27 @@ pub(crate) fn handle_menu_action(app_handle: &AppHandle, action: &str) {
             }
         },
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PendingTrayNavigation;
+
+    #[test]
+    fn consume_returns_stored_value_once_then_none() {
+        let state = PendingTrayNavigation::default();
+        state.set("home");
+        assert_eq!(state.take(), Some("home".to_string()));
+        assert_eq!(state.take(), None);
+    }
+
+    #[test]
+    fn later_navigation_replaces_earlier_one() {
+        let state = PendingTrayNavigation::default();
+        state.set("home");
+        state.set("settings");
+        assert_eq!(state.take(), Some("settings".to_string()));
+        assert_eq!(state.take(), None);
     }
 }
