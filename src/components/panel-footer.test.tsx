@@ -153,6 +153,34 @@ describe("PanelFooter", () => {
     expect(screen.getByText("Installing…")).toBeTruthy()
   })
 
+  it("shows Help when onHelp is provided and calls it on click", async () => {
+    const onHelp = vi.fn()
+    renderFooter({
+      version: "0.0.0",
+      autoUpdateNextAt: null,
+      updateStatus: idle,
+      onUpdateInstall: noop,
+      onHelp,
+      ...footerProps,
+    })
+
+    const help = screen.getByRole("button", { name: "Help" })
+    expect(help).toBeInTheDocument()
+    await userEvent.click(help)
+    expect(onHelp).toHaveBeenCalledTimes(1)
+  })
+
+  it("hides Help when onHelp is not provided", () => {
+    renderFooter({
+      version: "0.0.0",
+      autoUpdateNextAt: null,
+      updateStatus: idle,
+      onUpdateInstall: noop,
+      ...footerProps,
+    })
+    expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument()
+  })
+
   it("opens About dialog when clicking version in idle state", async () => {
     function Harness() {
       const [showAbout, setShowAbout] = useState(false)

@@ -1,9 +1,8 @@
 import { useCallback } from "react"
 import { useProductPollsStore } from "@/stores/product-polls-store"
 import { BarChart3, CircleHelp, Settings } from "lucide-react"
-import { openUrl } from "@tauri-apps/plugin-opener"
-import { FORK_REPO_URL } from "@/lib/fork-meta"
 import { invoke } from "@tauri-apps/api/core"
+import { openHelp } from "@/lib/help"
 import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu"
 import {
   DndContext,
@@ -267,10 +266,7 @@ export function SideNav({
       {/* Help */}
       <NavButton
         isActive={false}
-        onClick={() => {
-          openUrl(`${FORK_REPO_URL}/issues`).catch(console.error)
-          invoke("hide_panel").catch(console.error)
-        }}
+        onClick={openHelp}
         aria-label="Help"
       >
         <CircleHelp className="size-10" />

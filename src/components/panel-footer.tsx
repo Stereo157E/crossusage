@@ -12,6 +12,8 @@ interface PanelFooterProps {
   onUpdateInstall: () => void;
   onUpdateCheck: () => void;
   onRefreshAll?: () => void;
+  /** When provided, renders a Help button (opens the issue tracker). */
+  onHelp?: () => void;
   showAbout: boolean;
   onShowAbout: () => void;
   onCloseAbout: () => void;
@@ -93,6 +95,7 @@ export function PanelFooter({
   onUpdateInstall,
   onUpdateCheck,
   onRefreshAll,
+  onHelp,
   showAbout,
   onShowAbout,
   onCloseAbout,
@@ -116,13 +119,24 @@ export function PanelFooter({
   return (
     <>
       <div className="flex justify-between items-center h-8 pt-1.5 border-t">
-        <VersionDisplay
-          version={version}
-          updateStatus={updateStatus}
-          onUpdateInstall={onUpdateInstall}
-          onUpdateCheck={onUpdateCheck}
-          onVersionClick={onShowAbout}
-        />
+        <div className="flex items-center gap-2.5">
+          <VersionDisplay
+            version={version}
+            updateStatus={updateStatus}
+            onUpdateInstall={onUpdateInstall}
+            onUpdateCheck={onUpdateCheck}
+            onVersionClick={onShowAbout}
+          />
+          {onHelp ? (
+            <button
+              type="button"
+              onClick={onHelp}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              Help
+            </button>
+          ) : null}
+        </div>
         {autoUpdateNextAt !== null && onRefreshAll ? (
           <button
             type="button"

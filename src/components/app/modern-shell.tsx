@@ -37,6 +37,7 @@ import {
   providerOrderFromPluginSettings,
   migrateModernPlacedToTrayLines,
 } from "@/lib/modern-layout"
+import { openHelp } from "@/lib/help"
 import { savePluginSettings } from "@/lib/settings"
 import { resolveWidgetData } from "@/lib/widget-data"
 import { buildUsageInsights } from "@/lib/usage-insights"
@@ -470,6 +471,7 @@ export function ModernShell({
             onUpdateInstall={onUpdateInstall}
             onUpdateCheck={onUpdateCheck}
             onRefreshAll={onRefreshAll}
+            onHelp={openHelp}
             showAbout={showAbout}
             onShowAbout={() => setShowAbout(true)}
             onCloseAbout={() => setShowAbout(false)}

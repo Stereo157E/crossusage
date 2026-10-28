@@ -139,3 +139,8 @@
 - 2026-10-28: The consume hook (`usePendingTrayNavigation`) is mounted in both shells instead of the shared App component, because the modern shell derives its screen from local state that App cannot set. Both shells pass the same handlers to the event hook and the fallback hook, keeping the two paths semantically identical.
 
 - 2026-10-28: Modern layout macOS popover clamp: extract the classic `usePanel` window-sync effect into a shared `usePanelWindowSync` hook and the 76%-of-monitor clamp math into pure `src/lib/panel-height.ts` (`computeMaxPanelHeight`), so ModernShell applies the exact same `maxHeight` on the panel surface and window resize as the classic shell. Reuse over duplication; classic behavior unchanged. Re-sync key is a value-based string (view + plugin probe stamp) instead of array identity, since the ResizeObserver covers content-driven changes.
+
+## 2026-10-28
+
+- Modern layout Help entry: placed in the shared `PanelFooter` behind a new optional `onHelp` prop, wired only by `ModernShell`. The footer already hosts the meta/support actions (version, About, updates, refresh), while the modern nav row tabs represent screens — Help is an action, not a screen, so a nav-row button would mix categories. Optional prop keeps the classic layout untouched (its Help stays in the side-nav; no duplicate entry).
+- Help behavior extracted to `src/lib/help.ts` (`openHelp`: open `${FORK_REPO_URL}/issues` via `openUrl`, then `invoke("hide_panel")` — same order and error handling as the classic nav). `SideNav` now calls the same helper, so the issue URL lives in one place (`FORK_REPO_URL`) and both layouts share one implementation instead of two copies.
