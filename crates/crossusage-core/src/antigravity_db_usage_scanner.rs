@@ -220,12 +220,12 @@ fn aggregate(
     since: DateTime<Utc>,
     pricing: &ModelPricing,
 ) -> Vec<DailyUsageRow> {
-    let mut tokens_by_day: BTreeMap<String, i32> = BTreeMap::new();
+    let mut tokens_by_day: BTreeMap<String, i64> = BTreeMap::new();
     let mut cost_by_day: BTreeMap<String, f64> = BTreeMap::new();
-    let mut models_by_day: BTreeMap<String, BTreeMap<String, (i32, f64)>> = BTreeMap::new();
-    let mut input_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut output_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut cache_read_by_day: BTreeMap<String, i32> = BTreeMap::new();
+    let mut models_by_day: BTreeMap<String, BTreeMap<String, (i64, f64)>> = BTreeMap::new();
+    let mut input_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut output_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut cache_read_by_day: BTreeMap<String, i64> = BTreeMap::new();
 
     for event in events {
         let Some(ts) = DateTime::<Utc>::from_timestamp(event.timestamp_seconds, 0) else {
@@ -264,14 +264,14 @@ fn aggregate(
             continue;
         };
         let day = local_day_key_from_offset(&ts);
-        *tokens_by_day.entry(day.clone()).or_default() += total;
+        *tokens_by_day.entry(day.clone()).or_default() += i64::from(total);
         *cost_by_day.entry(day.clone()).or_default() += cost;
-        *input_by_day.entry(day.clone()).or_default() += input;
-        *output_by_day.entry(day.clone()).or_default() += output;
-        *cache_read_by_day.entry(day.clone()).or_default() += cache_read;
+        *input_by_day.entry(day.clone()).or_default() += i64::from(input);
+        *output_by_day.entry(day.clone()).or_default() += i64::from(output);
+        *cache_read_by_day.entry(day.clone()).or_default() += i64::from(cache_read);
         let slot = models_by_day.entry(day).or_default();
-        let e = slot.entry(event.model.clone()).or_insert((0, 0.0));
-        e.0 += total;
+        let e = slot.entry(event.model.clone()).or_insert((0i64, 0.0));
+        e.0 += i64::from(total);
         e.1 += cost;
     }
 

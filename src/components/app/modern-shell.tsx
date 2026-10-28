@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useShallow } from "zustand/react/shallow"
 import { invoke, isTauri } from "@tauri-apps/api/core"
@@ -291,6 +291,14 @@ export function ModernShell({
   // Same macOS popover height clamp as the classic shell: 76% of the monitor,
   // applied to the surface and synced to the window size.
   const surfaceRef = useRef<HTMLDivElement>(null)
+  // Stable callback: an inline ref re-fires on every render and makes useMotionPointer re-render.
+  const setSurfaceRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      surfaceRef.current = el
+      panelMotionRef(el)
+    },
+    [panelMotionRef],
+  )
   const maxPanelHeightPx = usePanelWindowSync(
     surfaceRef,
     `${screen}:${probeStamp}`,
@@ -304,10 +312,7 @@ export function ModernShell({
       <LiquidGlassFilter active={themeMode === "glass"} />
       {macPopoverChrome ? <div className="tray-arrow" aria-hidden="true" /> : null}
       <div
-        ref={(el) => {
-          surfaceRef.current = el
-          panelMotionRef(el)
-        }}
+        ref={setSurfaceRef}
         className="app-panel-surface relative w-full overflow-hidden rounded-[18px] select-none flex flex-col min-h-[320px]"
         data-ui-layout="modern"
         style={

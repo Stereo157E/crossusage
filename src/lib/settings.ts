@@ -1137,6 +1137,17 @@ export async function loadPersistUsageHistory(): Promise<boolean> {
   return typeof stored === "boolean" ? stored : false;
 }
 
+const USAGE_HISTORY_HINT_DISMISSED_KEY = "usageHistoryHintDismissed";
+
+export async function loadUsageHistoryHintDismissed(): Promise<boolean> {
+  return (await store.get<unknown>(USAGE_HISTORY_HINT_DISMISSED_KEY)) === true;
+}
+
+export async function saveUsageHistoryHintDismissed(): Promise<void> {
+  await store.set(USAGE_HISTORY_HINT_DISMISSED_KEY, true);
+  await store.save();
+}
+
 export const PERSIST_USAGE_HISTORY_CHANGED_EVENT = "persist-usage-history-changed";
 
 export async function savePersistUsageHistory(value: boolean): Promise<void> {

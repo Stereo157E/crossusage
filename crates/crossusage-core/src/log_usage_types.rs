@@ -194,11 +194,11 @@ impl TokenBreakdown {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelDayUsage {
-    pub input_tokens: i32,
-    pub output_tokens: i32,
-    pub cache_creation_tokens: i32,
-    pub cache_read_tokens: i32,
-    pub total_tokens: i32,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub cache_creation_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub total_tokens: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_cost: Option<f64>,
 }
@@ -207,11 +207,11 @@ pub struct ModelDayUsage {
 #[serde(rename_all = "camelCase")]
 pub struct DailyUsageRow {
     pub date: String,
-    pub input_tokens: i32,
-    pub output_tokens: i32,
-    pub cache_creation_tokens: i32,
-    pub cache_read_tokens: i32,
-    pub total_tokens: i32,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub cache_creation_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub total_tokens: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_cost: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]

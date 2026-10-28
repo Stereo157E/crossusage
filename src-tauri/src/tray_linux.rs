@@ -190,6 +190,8 @@ pub fn create(app_handle: &AppHandle) -> tauri::Result<()> {
         log_level,
         restart_label: "Restart".into(),
     }
+    // Without this, a missing tray host (stock GNOME, autostart before the panel) aborts startup.
+    .assume_sni_available(true)
     .spawn()
     .map_err(|error| tauri::Error::Anyhow(error.into()))?;
     assert!(TRAY.set(handle).is_ok(), "Linux tray was initialized twice");

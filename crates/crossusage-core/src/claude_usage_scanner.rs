@@ -528,14 +528,14 @@ fn should_replace(candidate: &ClaudeEntry, existing: &ClaudeEntry) -> bool {
 }
 
 fn aggregate(entries: &[ClaudeEntry], since: DateTime<Utc>, pricing: &ModelPricing) -> Vec<DailyUsageRow> {
-    let mut tokens_by_day: BTreeMap<String, i32> = BTreeMap::new();
+    let mut tokens_by_day: BTreeMap<String, i64> = BTreeMap::new();
     let mut cost_by_day: BTreeMap<String, f64> = BTreeMap::new();
     let mut priced_days: HashSet<String> = HashSet::new();
-    let mut models_by_day: BTreeMap<String, BTreeMap<String, (i32, f64)>> = BTreeMap::new();
-    let mut input_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut output_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut cache_create_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut cache_read_by_day: BTreeMap<String, i32> = BTreeMap::new();
+    let mut models_by_day: BTreeMap<String, BTreeMap<String, (i64, f64)>> = BTreeMap::new();
+    let mut input_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut output_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut cache_create_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut cache_read_by_day: BTreeMap<String, i64> = BTreeMap::new();
 
     for entry in entries {
         if entry.timestamp < since {
@@ -561,18 +561,17 @@ fn aggregate(entries: &[ClaudeEntry], since: DateTime<Utc>, pricing: &ModelPrici
         };
 
         let total = entry.tokens.total_tokens();
-        *tokens_by_day.entry(day.clone()).or_default() += total;
+        *tokens_by_day.entry(day.clone()).or_default() += i64::from(total);
         *cost_by_day.entry(day.clone()).or_default() += cost;
         priced_days.insert(day.clone());
-        *input_by_day.entry(day.clone()).or_default() += entry.tokens.input;
-        *output_by_day.entry(day.clone()).or_default() += entry.tokens.output;
-        *cache_create_by_day.entry(day.clone()).or_default() +=
-            entry.tokens.cache_write5m + entry.tokens.cache_write1h;
-        *cache_read_by_day.entry(day.clone()).or_default() += entry.tokens.cache_read;
+        *input_by_day.entry(day.clone()).or_default() += i64::from(entry.tokens.input);
+        *output_by_day.entry(day.clone()).or_default() += i64::from(entry.tokens.output);
+        *cache_create_by_day.entry(day.clone()).or_default() += i64::from(entry.tokens.cache_write5m + entry.tokens.cache_write1h);
+        *cache_read_by_day.entry(day.clone()).or_default() += i64::from(entry.tokens.cache_read);
 
         let slot = models_by_day.entry(day.clone()).or_default();
-        let e = slot.entry(model_name.to_string()).or_insert((0, 0.0));
-        e.0 += total;
+        let e = slot.entry(model_name.to_string()).or_insert((0i64, 0.0));
+        e.0 += i64::from(total);
         e.1 += cost;
     }
 
@@ -626,6 +625,30 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::TempDir;
+
+    #[test]
+    fn daily_totals_above_i32_max_do_not_overflow() {
+        // Heavy Max-plan days exceed 2^31 tokens through cache reads alone.
+        let entry = |id: &str| ClaudeEntry {
+            timestamp: Utc::now(),
+            tokens: TokenBreakdown {
+                cache_read: 1_500_000_000,
+                ..Default::default()
+            },
+            message_id: Some(id.into()),
+            request_id: Some(id.into()),
+            is_sidechain: false,
+            has_speed: false,
+            cost_usd: Some(1.0),
+            model: Some("claude-sonnet-4-20250514".into()),
+        };
+        let since = Utc::now() - chrono::Duration::days(1);
+        let rows = aggregate(&[entry("a"), entry("b")], since, &ModelPricing::from_bundled());
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].cache_read_tokens, 3_000_000_000);
+        assert_eq!(rows[0].total_tokens, 3_000_000_000);
+        assert_eq!(rows[0].models["claude-sonnet-4-20250514"].total_tokens, 3_000_000_000);
+    }
 
     #[test]
     fn parses_usage_line_and_aggregates() {

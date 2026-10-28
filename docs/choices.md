@@ -144,3 +144,6 @@
 
 - Modern layout Help entry: placed in the shared `PanelFooter` behind a new optional `onHelp` prop, wired only by `ModernShell`. The footer already hosts the meta/support actions (version, About, updates, refresh), while the modern nav row tabs represent screens — Help is an action, not a screen, so a nav-row button would mix categories. Optional prop keeps the classic layout untouched (its Help stays in the side-nav; no duplicate entry).
 - Help behavior extracted to `src/lib/help.ts` (`openHelp`: open `${FORK_REPO_URL}/issues` via `openUrl`, then `invoke("hide_panel")` — same order and error handling as the classic nav). `SideNav` now calls the same helper, so the issue URL lives in one place (`FORK_REPO_URL`) and both layouts share one implementation instead of two copies.
+- Linux tray startup without a tray host: keep running and let ksni re-register later (`assume_sni_available(true)`) instead of failing setup; the window stays reachable via the global shortcut.
+- Pending tray navigation is cleared by the event path (frontend invokes `consume_pending_tray_navigation`) rather than tracking listener readiness in Rust — smallest change, latest-wins semantics unchanged.
+- Usage-history hint dismissal lives in the settings store like every other preference; hint stays hidden until the stored value is loaded to avoid a flash.

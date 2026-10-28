@@ -6,6 +6,8 @@ import { UsageInsightsBanner } from "@/components/usage-insights-banner"
 const load = vi.hoisted(() => vi.fn(() => Promise.resolve(false)))
 vi.mock("@/lib/settings", () => ({
   loadPersistUsageHistory: load,
+  loadUsageHistoryHintDismissed: () => Promise.resolve(false),
+  saveUsageHistoryHintDismissed: () => Promise.resolve(),
   PERSIST_USAGE_HISTORY_CHANGED_EVENT: "persist-usage-history-changed",
 }))
 
@@ -20,7 +22,7 @@ describe("usage history preference updates", () => {
   it("removes the reminder immediately after enabling history", async () => {
     render(<Banner />)
     await waitFor(() => expect(load).toHaveBeenCalled())
-    expect(screen.getByText("Enable usage history for weekly totals.")).toBeInTheDocument()
+    expect(await screen.findByText("Enable usage history for weekly totals.")).toBeInTheDocument()
     act(() => {
       window.dispatchEvent(new CustomEvent("persist-usage-history-changed", { detail: true }))
     })
