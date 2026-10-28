@@ -625,12 +625,12 @@ fn dedup_events(events: Vec<CodexEvent>) -> Vec<CodexEvent> {
 }
 
 fn aggregate(events: &[CodexEvent], since: DateTime<Utc>, pricing: &ModelPricing) -> Vec<DailyUsageRow> {
-    let mut tokens_by_day: BTreeMap<String, i32> = BTreeMap::new();
+    let mut tokens_by_day: BTreeMap<String, i64> = BTreeMap::new();
     let mut cost_by_day: BTreeMap<String, f64> = BTreeMap::new();
     let mut priced_days: HashSet<String> = HashSet::new();
-    let mut models_by_day: BTreeMap<String, BTreeMap<String, (i32, f64)>> = BTreeMap::new();
-    let mut input_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut output_by_day: BTreeMap<String, i32> = BTreeMap::new();
+    let mut models_by_day: BTreeMap<String, BTreeMap<String, (i64, f64)>> = BTreeMap::new();
+    let mut input_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut output_by_day: BTreeMap<String, i64> = BTreeMap::new();
 
     for event in events {
         if event.timestamp < since {
@@ -662,14 +662,14 @@ fn aggregate(events: &[CodexEvent], since: DateTime<Utc>, pricing: &ModelPricing
         } else {
             (event.input - event.cached).max(0) + event.cached + event.output + event.reasoning
         };
-        *tokens_by_day.entry(day.clone()).or_default() += total;
+        *tokens_by_day.entry(day.clone()).or_default() += i64::from(total);
         *cost_by_day.entry(day.clone()).or_default() += cost;
         priced_days.insert(day.clone());
-        *input_by_day.entry(day.clone()).or_default() += event.input;
-        *output_by_day.entry(day.clone()).or_default() += event.output + event.reasoning;
+        *input_by_day.entry(day.clone()).or_default() += i64::from(event.input);
+        *output_by_day.entry(day.clone()).or_default() += i64::from(event.output + event.reasoning);
         let slot = models_by_day.entry(day.clone()).or_default();
-        let e = slot.entry(event.model.clone()).or_insert((0, 0.0));
-        e.0 += total;
+        let e = slot.entry(event.model.clone()).or_insert((0i64, 0.0));
+        e.0 += i64::from(total);
         e.1 += cost;
     }
 

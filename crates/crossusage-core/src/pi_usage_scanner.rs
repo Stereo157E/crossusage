@@ -229,13 +229,13 @@ fn aggregate(
     since: DateTime<Utc>,
     pricing: &ModelPricing,
 ) -> Vec<DailyUsageRow> {
-    let mut tokens_by_day: BTreeMap<String, i32> = BTreeMap::new();
+    let mut tokens_by_day: BTreeMap<String, i64> = BTreeMap::new();
     let mut cost_by_day: BTreeMap<String, f64> = BTreeMap::new();
-    let mut models_by_day: BTreeMap<String, BTreeMap<String, (i32, f64)>> = BTreeMap::new();
-    let mut input_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut output_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut cache_create_by_day: BTreeMap<String, i32> = BTreeMap::new();
-    let mut cache_read_by_day: BTreeMap<String, i32> = BTreeMap::new();
+    let mut models_by_day: BTreeMap<String, BTreeMap<String, (i64, f64)>> = BTreeMap::new();
+    let mut input_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut output_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut cache_create_by_day: BTreeMap<String, i64> = BTreeMap::new();
+    let mut cache_read_by_day: BTreeMap<String, i64> = BTreeMap::new();
 
     for entry in entries {
         if entry.card_id != card_id || entry.timestamp < since {
@@ -286,19 +286,18 @@ fn aggregate(
         };
 
         let total = entry.reported_total_tokens;
-        *tokens_by_day.entry(day.clone()).or_default() += total;
+        *tokens_by_day.entry(day.clone()).or_default() += i64::from(total);
         *cost_by_day.entry(day.clone()).or_default() += cost;
-        *input_by_day.entry(day.clone()).or_default() += entry.tokens.input;
-        *output_by_day.entry(day.clone()).or_default() += entry.tokens.output;
-        *cache_create_by_day.entry(day.clone()).or_default() +=
-            entry.tokens.cache_write5m + entry.tokens.cache_write1h;
-        *cache_read_by_day.entry(day.clone()).or_default() += entry.tokens.cache_read;
+        *input_by_day.entry(day.clone()).or_default() += i64::from(entry.tokens.input);
+        *output_by_day.entry(day.clone()).or_default() += i64::from(entry.tokens.output);
+        *cache_create_by_day.entry(day.clone()).or_default() += i64::from(entry.tokens.cache_write5m + entry.tokens.cache_write1h);
+        *cache_read_by_day.entry(day.clone()).or_default() += i64::from(entry.tokens.cache_read);
         let e = models_by_day
             .entry(day)
             .or_default()
             .entry(model_name.to_string())
-            .or_insert((0, 0.0));
-        e.0 += total;
+            .or_insert((0i64, 0.0));
+        e.0 += i64::from(total);
         e.1 += cost;
     }
 

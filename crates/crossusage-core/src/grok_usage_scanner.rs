@@ -16,7 +16,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-/// Cap before i32 conversion. Swift uses 1e12; DailyUsageRow tokens are i32.
+/// Per-entry cap before i32 conversion (Swift uses 1e12); daily totals are i64.
 const MAXIMUM_PLAUSIBLE_TOKENS: i32 = 1_000_000_000;
 const COST_TICKS_PER_USD: f64 = 10_000_000_000.0;
 
@@ -281,13 +281,13 @@ fn dedup(entries: Vec<Entry>) -> Vec<Entry> {
 }
 
 struct DayAcc {
-    tokens: i32,
+    tokens: i64,
     cost: f64,
-    input: i32,
-    output: i32,
-    cache_create: i32,
-    cache_read: i32,
-    models: BTreeMap<String, (i32, f64)>,
+    input: i64,
+    output: i64,
+    cache_create: i64,
+    cache_read: i64,
+    models: BTreeMap<String, (i64, f64)>,
 }
 
 fn aggregate(
@@ -319,14 +319,14 @@ fn aggregate(
                 cache_read: 0,
                 models: BTreeMap::new(),
             });
-        acc.tokens = acc.tokens.saturating_add(total);
+        acc.tokens = acc.tokens.saturating_add(i64::from(total));
         acc.cost += cost;
-        acc.input = acc.input.saturating_add(entry.tokens.input);
-        acc.output = acc.output.saturating_add(entry.tokens.output);
-        acc.cache_create = acc.cache_create.saturating_add(entry.tokens.cache_write5m);
-        acc.cache_read = acc.cache_read.saturating_add(entry.tokens.cache_read);
-        let m = acc.models.entry(entry.model.clone()).or_insert((0, 0.0));
-        m.0 = m.0.saturating_add(total);
+        acc.input = acc.input.saturating_add(i64::from(entry.tokens.input));
+        acc.output = acc.output.saturating_add(i64::from(entry.tokens.output));
+        acc.cache_create = acc.cache_create.saturating_add(i64::from(entry.tokens.cache_write5m));
+        acc.cache_read = acc.cache_read.saturating_add(i64::from(entry.tokens.cache_read));
+        let m = acc.models.entry(entry.model.clone()).or_insert((0i64, 0.0));
+        m.0 = m.0.saturating_add(i64::from(total));
         m.1 += cost;
     }
     days.into_iter()
