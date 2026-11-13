@@ -1,5 +1,23 @@
 # Breadcrumbs
 
+## 2026-11-04
+
+- Antigravity CLI quota summary: an unversioned client identity returned only third-party buckets on a live Google account. A versioned CLI identity (`antigravity/cli/1.5.0`) restored Gemini session and weekly buckets in both `plugins/antigravity-cli/plugin.js` (#49) and the `probeAgyCloudCode` fallback in `plugins/antigravity/plugin.js`. The plugin tests assert the header, and a live probe verified the returned buckets on one account.
+
+## 2026-11-02
+
+- JetBrains AI Assistant live quota fix (#41): added multi-source probing to `plugins/jetbrains-ai-assistant/plugin.js` — Tier 1 live IDE JSON-RPC (`~/.junie/instances/*.json` → `http://127.0.0.1:<port>/rpc` `JunieSystemService.getQuotaInfo`), Tier 2 Junie CLI / Grazzio cloud API (`~/.junie/secure_credentials.json` or `junie-cli` keychain → `GET https://ingrazzio-cloud-prod.labs.jb.gg/auth/test` + OAuth refresh), Tier 3 Junie CLI session logs (`~/.junie/sessions/*/events.jsonl`), Tier 4 IDE `idea.log` (`QuotaManager2Impl`), and Tier 5 `AIAssistantQuotaManager2.xml` fallback; added `username`, `rpc_token`, `simpleToken` redaction in `host_api.rs`.
+- Reviewed and merged PRs #43, #44, #45, and #46 onto `feat/linux-windows-native-support`.
+- Post-merge polish: updated `cursor_state_db_has_auth` to ignore `cursor-safe-storage:` ciphertext; allowed `cursor_usage_export` (`fetch_cursor_month_to_date_totals_uncached`, `download_cursor_usage_csv_for_plugin`, `fetch_cursor_usage_rows_via_events`) to authenticate via Cursor CLI `auth.json` even when `state.vscdb` is absent; formatted underscore-separated Perplexity `subscription_tier` values (e.g. `enterprise_pro` → `Enterprise Pro`); and extended `redact_body` JWT regex in `host_api.rs` to redact 5-segment JWE tokens (such as `next-auth` session cookies).
+
+## 2026-11-01
+
+- Provider order: startup normalization preserves saved order instead of alphabetically sorting every launch. Regression coverage includes custom provider orders, disabled entries, and newly discovered providers. Modern dashboard and Customize both use plugins.order; modernLayout.providerOrder is legacy state.
+- `feat/perplexity-cookie-auth`: Perplexity on Windows/Linux via a pasted session cookie. `plugins/perplexity/plugin.js` gets `probeViaCookie` (cookie-shape detection, `fetchWebJson`, `buildCookieHeader`); `probe()` tries it first and falls back to the unchanged macOS cache path. Docs (`docs/providers/perplexity.md`, `multi-account-credentials.md`) and the credentials-dialog placeholder/hint in `settings.tsx` updated. Verified live on Windows against a real account: `rate-limit/status`, `billing/credits`, `api/auth/session` all 200, no Cloudflare challenge. 13 new tests in `plugin.test.js`.
+- Checked `host_api.rs` redaction per AGENTS.md: request headers (including the new `Cookie`) are never logged, only the redacted URL and redacted response body. No redaction-list changes needed.
+- Run `npx tsc --noEmit` before pushing UI changes: vitest does not typecheck, and a redundant `form.mode !== "rename"` inside the `!isRename` branch passed all tests but failed `tsc`.
+- Open finding, not fixed here: `redact_body`'s JWT regex expects 3 dot-separated segments; `next-auth` cookies are JWE (5 segments, empty 2nd). A JWE appearing in a response body would not be redacted. Perplexity response bodies carry no token, so this PR is unaffected; worth its own issue.
+
 ## 2026-10-19
 
 - Resolved Grok Bot QA notes and CI checks on PR #40: added `crates/crossusage-cli/build.rs` so `embedded_plugins.rs` stages filtered runtime plugins into `$OUT_DIR/bundled_plugins` without requiring `copy-bundled.cjs` first; auto-created the dev CLI sidecar stub in `scripts/tauri-before-dev.cjs` for clean checkouts; localized the Modern top navigation tabs (`dashboard`, `customize`, `polls`, `settings`) in `modern-shell.tsx` across all 13 locales; fixed `cursorPaths.resolveStateDb` zero-argument arity in `host_api.rs`; and silenced Windows dead-code warnings in `chromium_cookies.rs`.
@@ -135,3 +153,10 @@
 - 2026-10-28: Review fixes. Linux KSNI tray spawns with `assume_sni_available(true)` so a missing StatusNotifier watcher/host (stock GNOME, autostart before the panel) no longer aborts app startup; ksni re-registers when a host appears. Tray event handlers (`useTrayNavigation`, `usePanel`) now clear `PendingTrayNavigation`, so a handled click is not replayed on shell remount (layout switch, reload). ModernShell surface ref is a stable `useCallback` (inline ref re-fired `useMotionPointer` state every render). Usage-history hint dismissal moved from `localStorage` to the settings store. Validation: frontend suite 1611 green, `tsc --noEmit` clean; Rust not compiled in this environment (no webkit2gtk).
 
 - 2026-10-28: Fixed `probe claude panicked` ("attempt to add with overflow", `claude_usage_scanner.rs`). Daily token totals were summed in `i32`; heavy Max-plan days exceed 2^31 via cache reads. `DailyUsageRow`/`ModelDayUsage` token fields and every scanner's per-day accumulators (Claude, Codex, Pi, Grok, Antigravity) are now `i64`; per-entry `TokenBreakdown` stays `i32`. Regression test `daily_totals_above_i32_max_do_not_overflow`. Validation: crossusage-core scanner tests green; 3 `host_api` ccusage/cursor tests fail identically on the base commit in this environment (unrelated).
+
+## 2026-11-13
+
+- Fetched the 17 CrossUsage upstream commits through `78b243b` for local integration. Application code merged automatically; retained fork engineering notes alongside upstream notes in the two documentation conflicts.
+- Recorded the CrossUsage-only maintenance policy in `AGENTS.md` and `FORK-UPSTREAM.md`; Claude continues to load the shared instructions through `CLAUDE.md`. No upstream push or fork publication.
+- Validation: `bun run test` (1,659 tests), `bun run build`, `bun run test:build-scripts` (5 tests), `cargo test -p crossusage-cli` (5 tests), and `cargo test -p crossusage --lib` (58 tests) passed. Core library tests passed (194), excluding the two documented environment-sensitive ccusage subprocess tests. Prepared the debug CLI sidecar and bundled plugins before desktop tests.
+- Verified preserved fork code for native Linux integration, disabled binary updates, modern-layout controls, usage-history behavior, and Claude credentials/token overflow. Reviewed new provider fields against the shared core host redaction: request authorization/cookie headers are not logged; upstream adds JWE body and JetBrains username/token regressions. CLI listing completed; no interactive desktop or authenticated checks of the changed providers were performed.

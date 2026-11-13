@@ -1,5 +1,16 @@
 # Choices
 
+## 2026-11-04
+
+- Antigravity CLI quota summary: use the tested versioned `antigravity/cli/1.5.0` identity for `retrieveUserQuotaSummary`; the unversioned identity produced a partial response without Gemini buckets on one account. See [the dated decision](DECISIONS.md#2026-11-04--identify-the-antigravity-cli-quota-client-with-a-versioned-user-agent) for evidence and reconsideration triggers.
+
+## 2026-11-01
+
+- **Perplexity Windows/Linux auth:** cookie, not Bearer. No CFNetwork-equivalent cache and no plaintext token on disk (checked live app data and a HAR from the web client: only `next-auth` JWE cookies, 5 segments, exist). Send as a `Cookie` header to the same REST paths the account page uses (`rate-limit/status`, `billing/credits`, `api/auth/session`), not `Authorization: Bearer`.
+- **Credential-shape detection:** the `readProviderCredential()` value routes to cookie auth when it contains `=` or looks like `eyJ...` with 3+ dots (JWE, not the 3-part Bearer JWT); otherwise it falls through to the existing macOS cache path. No new plugin API surface.
+- **Line shape for cookie mode:** `text` lines, not `progress`. `rate-limit/status` returns exact remaining counts only for some modes (`kind: "exact"`); most report `kind: "not_provided"`, rendered as `available` / `not available` instead of a made-up bar.
+- **Not reusing `chromiumCookies.read`:** it explicitly does not support Windows yet (DPAPI / v20) and reads browser profiles, not Electron app dirs. Revisit if it gains Windows support.
+
 ## 2026-10-19
 
 - **1.6.1 (PATCH):** OpenUsage **v0.7.14 + v0.7.15** ports + build/size optimization pass ([VERSIONING.md](./VERSIONING.md)).
@@ -147,3 +158,8 @@
 - Linux tray startup without a tray host: keep running and let ksni re-register later (`assume_sni_available(true)`) instead of failing setup; the window stays reachable via the global shortcut.
 - Pending tray navigation is cleared by the event path (frontend invokes `consume_pending_tray_navigation`) rather than tracking listener readiness in Rust — smallest change, latest-wins semantics unchanged.
 - Usage-history hint dismissal lives in the settings store like every other preference; hint stays hidden until the stored value is loaded to avoid a flash.
+
+## 2026-11-13
+
+- Integrate CrossUsage upstream history without replacing fork commits. Keep both sets of engineering notes when upstream documentation cleanup overlaps fork additions.
+- Preserve the native Linux tray/window behavior, disabled upstream binary updater, Claude credential precedence, usage-history hint persistence, and modern-layout navigation fixes. Upstream provider ordering now preserves saved order instead of re-sorting on startup.
