@@ -42,6 +42,15 @@ Work style: Be radically precise. No fluff. Pure information only (drop grammar;
 - If user types a command (“pull and push”), that’s consent for that command.
 - Big review: `git --no-pager diff --color=never`.
 
+## Private fork maintenance
+- This repository is a private CrossUsage fork. The only upstream to track is `barramee27/crossusage`, currently branch `feat/linux-windows-native-support`.
+- Do not track or port OpenUsage directly. Existing OpenUsage port documents are historical context, not instructions for this fork.
+- Never push to upstream CrossUsage. Fetching and local integration are allowed when requested; publishing to this fork requires explicit user authorization.
+- Merge upstream history rather than replacing our branch. Preserve valid fork changes; adapt them when upstream changes require it. Never resolve conflicts by blindly accepting upstream.
+- Review major upstream redesigns for compatibility and tradeoffs before integration.
+- Validate the combined result with tests/builds and regression checks for fork customizations. Report conflicts, adaptations, and validation limits.
+- Current workflow and historical context: `docs/FORK-UPSTREAM.md`. `CLAUDE.md` directs Claude agents to this file.
+
 ## Error Handling
 - Expected issues: explicit result types (not throw/try/catch).
   - Exception: external systems (git, gh) → try/catch ok.

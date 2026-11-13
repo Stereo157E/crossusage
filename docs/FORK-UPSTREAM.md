@@ -1,4 +1,24 @@
-# Forking upstream OpenUsage
+# Private CrossUsage fork maintenance
+
+## Active policy
+
+- Track only [barramee27/crossusage](https://github.com/barramee27/crossusage), currently its default branch `feat/linux-windows-native-support`.
+- Do not track OpenUsage directly. Its port specifications and the historical sections below describe inherited CrossUsage work, not this fork's update policy.
+- Never push to upstream CrossUsage. Do not publish this fork unless explicitly requested.
+- Fetch and merge upstream history locally when requested. Preserve valid customizations; adapt them to upstream changes rather than discarding them.
+- Assess major redesigns before integration. Stop on conflicts; explain the tradeoff rather than accepting upstream wholesale.
+- Review upstream changes and run tests/builds plus relevant fork regression checks. Record what passed, what failed, and what could not be exercised.
+- Keep the upstream binary updater disabled for this fork; installing upstream binaries would replace fork customizations.
+
+## Integration checklist
+
+1. Inspect the worktree, remotes, and upstream default branch; preserve unrelated local edits.
+2. Fetch the CrossUsage branch, pin its commit, and compare both sides of the divergence.
+3. Merge without rewriting fork history. Review the merge against both parents and check that fork-specific behavior survives.
+4. Run `bun run test`, `bun run build`, and `cargo test -p crossusage-cli`; add focused checks for affected customizations and plugin redaction.
+5. Report the local integration result. No push, release, or upstream contribution is implied.
+
+## Historical CrossUsage porting notes (not active instructions)
 
 CrossUsage is the **Tauri Linux/Windows** line. Upstream **OpenUsage 0.7+** is a **Swift native macOS** app on branch **`upstream/swift`** (`v0.7.0-beta`). We do not merge Swift sources wholesale — we **rewrite** applicable UX in this repo or **copy** portable `plugins/` changes.
 
