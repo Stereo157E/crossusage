@@ -73,6 +73,8 @@ import {
   saveUsageAlertEnabled,
   saveUsageAlertSound,
   saveUsageAlertThreshold,
+  loadUsageInsightDismissals,
+  saveUsageInsightDismissal,
 } from "@/lib/settings"
 import type { PluginMeta } from "@/lib/plugin-types"
 
@@ -104,6 +106,16 @@ describe("settings", () => {
     storeState.clear()
     storeDeleteMock.mockReset()
     storeSaveMock.mockReset()
+  })
+
+  it("persists rapid independent insight dismissals without losing a row", async () => {
+    await Promise.all([
+      saveUsageInsightDismissal("snapshot:claude", 100),
+      saveUsageInsightDismissal("rollup:7", 200),
+    ])
+    await expect(loadUsageInsightDismissals()).resolves.toEqual({
+      "snapshot:claude": 100, "rollup:7": 200,
+    })
   })
 
   it("loads defaults when no settings stored", async () => {

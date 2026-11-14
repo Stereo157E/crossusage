@@ -163,3 +163,9 @@
 
 - Integrate CrossUsage upstream history without replacing fork commits. Keep both sets of engineering notes when upstream documentation cleanup overlaps fork additions.
 - Preserve the native Linux tray/window behavior, disabled upstream binary updater, Claude credential precedence, usage-history hint persistence, and modern-layout navigation fixes. Upstream provider ordering now preserves saved order instead of re-sorting on startup.
+
+## 2026-11-14
+
+- Give each saved snapshot, 7-/30-day rollup, and sparkline its own visible dismiss button. Persist each dismissal for 24 hours; live insights retain their reset-based expiry. Remove the whole-banner dismiss action and ignore its superseded setting. Serialize per-row saves so rapid dismissals cannot overwrite each other.
+- Enable native Linux decorations at window creation. Use stable Tauri 2.12.5 / Tao 0.37.2 to include the upstream Wayland decoration fix (tao#1218); older Tao forced a custom GTK titlebar even on KDE. Preserve native Wayland and close-to-tray behavior.
+- Format dashboard rollups, cost totals, and cost-per-token values through the shared display-currency formatter; keep source amounts in USD for aggregation.

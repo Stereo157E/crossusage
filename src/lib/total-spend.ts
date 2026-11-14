@@ -1,4 +1,5 @@
 import type { MetricLine, ModelSpendBreakdown, PluginOutput } from "@/lib/plugin-types"
+import { formatMoney } from "@/lib/locale-format"
 
 export const TOTAL_SPEND_PERIODS = ["Today", "Yesterday", "Last 30 Days"] as const
 export type TotalSpendPeriod = (typeof TOTAL_SPEND_PERIODS)[number]
@@ -294,10 +295,10 @@ export function formatTotalSpendCenter(
   metric: TotalSpendMetric,
 ): { primary: string; unit: string } {
   if (metric === "cost") {
-    return { primary: `$${value.toFixed(2)}`, unit: "total" }
+    return { primary: formatMoney(value), unit: "total" }
   }
   if (metric === "costPerMtok") {
-    return { primary: `$${value < 10 ? value.toFixed(2) : value.toFixed(1)}`, unit: "/MTok" }
+    return { primary: formatMoney(value), unit: "/MTok" }
   }
   if (value >= 1_000_000) {
     return { primary: `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 1 : 2)}M`, unit: "tokens" }
@@ -310,7 +311,7 @@ export function formatTotalSpendCenter(
 
 export function formatTotalSpendLegend(value: number, metric: TotalSpendMetric): string {
   if (metric === "cost" || metric === "costPerMtok") {
-    return `$${value.toFixed(2)}${metric === "costPerMtok" ? "/MTok" : ""}`
+    return `${formatMoney(value)}${metric === "costPerMtok" ? "/MTok" : ""}`
   }
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`

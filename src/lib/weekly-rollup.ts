@@ -1,4 +1,5 @@
 import type { UsageDailyRow } from "@/lib/usage-daily"
+import { formatMoney } from "@/lib/locale-format"
 
 export type WeeklyRollupWindow = {
   /** Inclusive YYYY-MM-DD */
@@ -152,7 +153,7 @@ export function formatRollupSummary(rollup: WeeklyRollupResult): string {
   let costPart = ""
   if (rollup.current.costUsd > 0) {
     const costDelta = formatDeltaPct(rollup.costDeltaPct, priorLabel)
-    costPart = ` · ~$${rollup.current.costUsd.toFixed(2)}${costDelta}`
+    costPart = ` · ~${formatMoney(rollup.current.costUsd)}${costDelta}`
   }
 
   return `This ${label}: ${tokens}${tokenDelta}${costPart}`

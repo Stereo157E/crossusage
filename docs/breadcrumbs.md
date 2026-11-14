@@ -160,3 +160,14 @@
 - Recorded the CrossUsage-only maintenance policy in `AGENTS.md` and `FORK-UPSTREAM.md`; Claude continues to load the shared instructions through `CLAUDE.md`. No upstream push or fork publication.
 - Validation: `bun run test` (1,659 tests), `bun run build`, `bun run test:build-scripts` (5 tests), `cargo test -p crossusage-cli` (5 tests), and `cargo test -p crossusage --lib` (58 tests) passed. Core library tests passed (194), excluding the two documented environment-sensitive ccusage subprocess tests. Prepared the debug CLI sidecar and bundled plugins before desktop tests.
 - Verified preserved fork code for native Linux integration, disabled binary updates, modern-layout controls, usage-history behavior, and Claude credentials/token overflow. Reviewed new provider fields against the shared core host redaction: request authorization/cookie headers are not logged; upstream adds JWE body and JetBrains username/token regressions. CLI listing completed; no interactive desktop or authenticated checks of the changed providers were performed.
+
+## 2026-11-14
+
+- Fixed usage-insights dismissal: a visible close button hides the complete banner across remounts/restarts for 24 hours; live insight dismissal now invalidates the memoized filter immediately.
+- Removed hardcoded USD formatting from dashboard rollups and the total-spend chart. Both components subscribe to currency, locale, and exchange-rate updates.
+- Enabled Linux native window decorations; the previous Linux override explicitly disabled the titlebar. Native close requests retain the existing hide-to-tray handler.
+- Validation: 1,663 frontend tests, production frontend build, and `cargo check -p crossusage --lib` passed. Added dismissal/expiry, EUR conversion, and Linux window-configuration regressions. KDE compositor rendering requires a rebuilt desktop app and remains unverified interactively.
+
+- Follow-up: replaced whole-banner dismissal with separate snapshot, rollup, and trend dismissals; the previous whole-banner setting is no longer read. Added independent-row/empty-banner and concurrent-save regressions.
+- Confirmed KDE decoration root cause in Tao 0.35.3: an unconditional custom GTK HeaderBar on Wayland. Updated stable Tauri to 2.12.5 and its JavaScript API to 2.12.4; resolved Tao 0.37.2 includes upstream tao#1218 without forcing XWayland.
+- Follow-up validation: 1,665 frontend tests, 58 release-profile desktop Rust tests, and the production Tauri build passed. Wayland runtime negotiation requested and received KDE server-side decoration mode; restarted the local app without protocol tracing.

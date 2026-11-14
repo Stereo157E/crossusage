@@ -1075,6 +1075,27 @@ export async function loadPersistUsageHistory(): Promise<boolean> {
 
 const USAGE_HISTORY_HINT_DISMISSED_KEY = "usageHistoryHintDismissed";
 
+export async function loadUsageInsightDismissals(): Promise<Record<string, number>> {
+  const value = await store.get<unknown>("usageInsightDismissals");
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(
+    (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]),
+  ));
+}
+
+let usageInsightDismissalSave: Promise<void> = Promise.resolve();
+
+export function saveUsageInsightDismissal(key: string, until: number): Promise<void> {
+  const save = usageInsightDismissalSave.then(async () => {
+    const dismissals = await loadUsageInsightDismissals();
+    await store.set("usageInsightDismissals", { ...dismissals, [key]: until });
+    await store.save();
+  });
+  // Keep subsequent writes usable after a failure; the caller receives the error.
+  usageInsightDismissalSave = save.catch(() => {});
+  return save;
+}
+
 export async function loadUsageHistoryHintDismissed(): Promise<boolean> {
   return (await store.get<unknown>(USAGE_HISTORY_HINT_DISMISSED_KEY)) === true;
 }

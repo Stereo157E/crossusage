@@ -41,6 +41,9 @@ type TotalSpendCardProps = {
 }
 
 export function TotalSpendCard({ providers, outputs, compact, className }: TotalSpendCardProps) {
+  useAppPreferencesStore((s) => s.displayCurrency)
+  useAppPreferencesStore((s) => s.appLocale)
+  useAppPreferencesStore((s) => s.exchangeRatesRevision)
   const { showTotalSpend, totalSpendMetric, setShowTotalSpend, setTotalSpendMetric } =
     useAppPreferencesStore(
       useShallow((s) => ({

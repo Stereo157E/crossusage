@@ -4,10 +4,13 @@ import { usePersistUsageHistory } from "./use-persist-usage-history"
 import { UsageInsightsBanner } from "@/components/usage-insights-banner"
 
 const load = vi.hoisted(() => vi.fn(() => Promise.resolve(false)))
-vi.mock("@/lib/settings", () => ({
+vi.mock("@/lib/settings", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/settings")>(),
   loadPersistUsageHistory: load,
   loadUsageHistoryHintDismissed: () => Promise.resolve(false),
   saveUsageHistoryHintDismissed: () => Promise.resolve(),
+  loadUsageInsightDismissals: () => Promise.resolve({}),
+  saveUsageInsightDismissal: () => Promise.resolve(),
   PERSIST_USAGE_HISTORY_CHANGED_EVENT: "persist-usage-history-changed",
 }))
 

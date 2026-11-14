@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
-import { loadUsageHistoryHintDismissed, saveUsageHistoryHintDismissed } from "@/lib/settings"
+import {
+  loadUsageHistoryHintDismissed,
+  saveUsageHistoryHintDismissed,
+  loadUsageInsightDismissals,
+  saveUsageInsightDismissal,
+} from "@/lib/settings"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { UsageSparkline } from "@/components/usage-sparkline"
 import { dismissInsight, filterDismissedInsights } from "@/lib/insight-dismiss"
 import type { UsageInsight } from "@/lib/usage-insights"
@@ -52,12 +58,19 @@ export function UsageInsightsBanner({
   onOpenUsageHistory,
   className,
 }: UsageInsightsBannerProps) {
-  const [, bump] = useState(0)
+  const [dismissRevision, bump] = useState(0)
+  useAppPreferencesStore((s) => s.displayCurrency)
+  useAppPreferencesStore((s) => s.appLocale)
+  useAppPreferencesStore((s) => s.exchangeRatesRevision)
+  const [dismissals, setDismissals] = useState<Record<string, number> | null>(null)
   const openUsageHistory = useAppUiStore((s) => s.openUsageHistory)
   // null until loaded from the settings store, so a dismissed hint never flashes.
   const [historyHintDismissed, setHistoryHintDismissed] = useState<boolean | null>(null)
   useEffect(() => {
     let mounted = true
+    loadUsageInsightDismissals()
+      .then((values) => { if (mounted) setDismissals(values) })
+      .catch((error) => console.error("loadUsageInsightDismissals:", error))
     loadUsageHistoryHintDismissed()
       .then((dismissed) => {
         if (mounted) setHistoryHintDismissed(dismissed)
@@ -70,7 +83,7 @@ export function UsageInsightsBanner({
 
   const visibleInsights = useMemo(
     () => filterDismissedInsights(insights, nowMs),
-    [insights, nowMs, bump],
+    [insights, nowMs, dismissRevision],
   )
 
   const sparklineWindow = rollingWindowDays(7, new Date(nowMs)).current
@@ -78,19 +91,22 @@ export function UsageInsightsBanner({
     () => buildAggregatedSparklinePoints(dailyRows, sparklineWindow),
     [dailyRows, sparklineWindow.startDay, sparklineWindow.endDay],
   )
+  const isVisible = (key: string) => nowMs >= (dismissals?.[key] ?? 0)
+  const visibleHistory = historyTightest.filter((row) => isVisible(`snapshot:${row.instanceId}`))
   const showSparkline =
-    persistEnabled && sparklinePoints.length >= 2
+    persistEnabled && sparklinePoints.length >= 2 && isVisible("sparkline")
 
   const showRollup30 =
-    rollup30 != null &&
+    rollup30 != null && isVisible("rollup:30") &&
     countDistinctDaysInWindow(dailyRows, rollup30.currentWindow) >= 7
 
   const showRollupHint = !persistEnabled && historyHintDismissed === false
   const hasInsights = visibleInsights.length > 0
-  const hasHistoryTightest = persistEnabled && historyTightest.length > 0
-  const hasRollup = rollup != null
+  const hasHistoryTightest = persistEnabled && visibleHistory.length > 0
+  const hasRollup = rollup != null && isVisible("rollup:7")
 
-  if (!hasInsights && !hasHistoryTightest && !hasRollup && !showRollup30 && !showSparkline && !showRollupHint) {
+  const hasContent = hasInsights || hasHistoryTightest || hasRollup || showRollup30 || showSparkline || showRollupHint
+  if (dismissals === null || !hasContent) {
     return null
   }
 
@@ -99,6 +115,15 @@ export function UsageInsightsBanner({
     const until = row.dismissUntilMs ?? nowMs + 86_400_000
     dismissInsight(row, until)
     bump((n) => n + 1)
+  }
+
+  const dismissItem = (key: string) => {
+    const until = nowMs + 86_400_000
+    setDismissals((current) => ({ ...current, [key]: until }))
+    void saveUsageInsightDismissal(key, until).catch((error) => {
+      setDismissals((current) => ({ ...current, [key]: 0 }))
+      console.error("Could not save usage insight dismissal", error)
+    })
   }
 
   return (
@@ -141,8 +166,9 @@ export function UsageInsightsBanner({
 
       {hasHistoryTightest ? (
         <ul className="space-y-1">
-          {historyTightest.map((row) => (
+          {visibleHistory.map((row) => (
             <li key={`history-${row.instanceId}`} className="text-foreground/90">
+              <DismissibleRow label={`${row.displayName} snapshot`} onDismiss={() => dismissItem(`snapshot:${row.instanceId}`)}>
               <button
                 type="button"
                 className="text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
@@ -153,12 +179,14 @@ export function UsageInsightsBanner({
                 </span>
                 {formatHistoryTightestMessage(row)}
               </button>
+              </DismissibleRow>
             </li>
           ))}
         </ul>
       ) : null}
 
       {hasRollup ? (
+        <DismissibleRow label="7-day summary" onDismiss={() => dismissItem("rollup:7")}>
         <p className="text-foreground/90">
           <span className="text-muted-foreground mr-1.5" aria-hidden>
             ∑
@@ -171,23 +199,28 @@ export function UsageInsightsBanner({
             </span>
           ) : null}
         </p>
+        </DismissibleRow>
       ) : null}
 
       {showRollup30 ? (
+        <DismissibleRow label="30-day summary" onDismiss={() => dismissItem("rollup:30")}>
         <p className="text-foreground/90">
           <span className="text-muted-foreground mr-1.5" aria-hidden>
             ∑
           </span>
           {formatRollupSummary(rollup30!)}
         </p>
+        </DismissibleRow>
       ) : null}
 
       {showSparkline ? (
+        <DismissibleRow label="7-day usage trend" onDismiss={() => dismissItem("sparkline")}>
         <UsageSparkline
           label="Last 7d (all accounts)"
           points={sparklinePoints}
           note="Estimated from local logs (not billing)."
         />
+        </DismissibleRow>
       ) : null}
 
       {(hasRollup || showRollup30) && !showSparkline ? (
@@ -221,5 +254,22 @@ export function UsageInsightsBanner({
         </div>
       ) : null}
     </section>
+  )
+}
+
+function DismissibleRow({ label, onDismiss, children }: {
+  label: string
+  onDismiss: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-start gap-1">
+      <div className="min-w-0 flex-1">{children}</div>
+      <button type="button"
+        className="shrink-0 px-1 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={`Dismiss ${label}`} title="Dismiss for 24 hours" onClick={onDismiss}>
+        ×
+      </button>
+    </div>
   )
 }
