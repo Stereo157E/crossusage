@@ -171,3 +171,4 @@
 - Follow-up: replaced whole-banner dismissal with separate snapshot, rollup, and trend dismissals; the previous whole-banner setting is no longer read. Added independent-row/empty-banner and concurrent-save regressions.
 - Confirmed KDE decoration root cause in Tao 0.35.3: an unconditional custom GTK HeaderBar on Wayland. Updated stable Tauri to 2.12.5 and its JavaScript API to 2.12.4; resolved Tao 0.37.2 includes upstream tao#1218 without forcing XWayland.
 - Follow-up validation: 1,665 frontend tests, 58 release-profile desktop Rust tests, and the production Tauri build passed. Wayland runtime negotiation requested and received KDE server-side decoration mode; restarted the local app without protocol tracing.
+- Adjusted Linux startup geometry from 600 × 800 to 460 × 900 logical pixels for a narrower, taller window. Release build passed; geometry validated visually under KDE.
